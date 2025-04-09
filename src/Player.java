@@ -1,4 +1,3 @@
-// Player.java
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.HashSet;
@@ -147,11 +146,4 @@ public class Player {
         return health;
     }
 
-    public int getShipType() {
-        return shipType;
-    }
-
-    public boolean isInvincible() {
-        return invincible;
-    }
 }

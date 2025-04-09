@@ -9,7 +9,6 @@ public class GameWindow extends JFrame {
     private MenuPanel menuPanel;
     private GamePanel gamePanel;
     private HighscorePanel highscorePanel;
-    private SettingsPanel settingsPanel;
 
     public GameWindow() {
         setTitle("Space Defender");
@@ -46,12 +45,6 @@ public class GameWindow extends JFrame {
         switchToPanel(highscorePanel);
     }
 
-    public void showSettings() {
-        cleanUpCurrentPanel();
-        settingsPanel = new SettingsPanel(this);
-        switchToPanel(settingsPanel);
-    }
-
     private void cleanUpCurrentPanel() {
         if (gamePanel != null) {
             gamePanel.cleanUp();
@@ -66,10 +59,7 @@ public class GameWindow extends JFrame {
             remove(highscorePanel);
             highscorePanel = null;
         }
-        if (settingsPanel != null) {
-            remove(settingsPanel);
-            settingsPanel = null;
-        }
+
     }
 
     private void switchToPanel(JPanel panel) {
@@ -124,57 +114,6 @@ public class GameWindow extends JFrame {
         }
     }
 
-    private static class SettingsPanel extends JPanel {
-        public SettingsPanel(GameWindow parent) {
-            setLayout(new GridBagLayout());
-            setBackground(new Color(30, 30, 50));
-
-            GridBagConstraints gbc = new GridBagConstraints();
-            gbc.insets = new Insets(15, 15, 15, 15);
-            gbc.gridx = 0;
-            gbc.gridy = 0;
-            gbc.anchor = GridBagConstraints.CENTER;
-
-            JLabel title = new JLabel("SETTINGS", SwingConstants.CENTER);
-            title.setFont(new Font("Arial", Font.BOLD, 36));
-            title.setForeground(new Color(255, 215, 0));
-            add(title, gbc);
-
-            JPanel optionsPanel = new JPanel(new GridLayout(0, 1, 10, 10));
-            optionsPanel.setBackground(new Color(0, 0, 0, 150));
-            optionsPanel.setBorder(BorderFactory.createLineBorder(new Color(70, 130, 180), 2));
-            gbc.gridy++;
-            add(optionsPanel, gbc);
-
-            // Volume settings
-            addVolumeControls(optionsPanel);
-
-            JButton backButton = new JButton("BACK TO MENU");
-            backButton.addActionListener(e -> parent.showMenu());
-            styleButton(backButton, new Color(70, 130, 180));
-            gbc.gridy++;
-            add(backButton, gbc);
-        }
-
-        private void addVolumeControls(JPanel panel) {
-            JPanel musicPanel = new JPanel();
-            musicPanel.setBackground(new Color(0, 0, 0, 0));
-            musicPanel.add(new JLabel("Music Volume:"));
-            JSlider musicSlider = new JSlider(0, 100, SoundManager.getMusicVolume());
-            musicSlider.addChangeListener(e -> SoundManager.setMusicVolume(musicSlider.getValue()));
-            musicPanel.add(musicSlider);
-            panel.add(musicPanel);
-
-            JPanel soundPanel = new JPanel();
-            soundPanel.setBackground(new Color(0, 0, 0, 0));
-            soundPanel.add(new JLabel("Sound Volume:"));
-            JSlider soundSlider = new JSlider(0, 100, SoundManager.getSoundVolume());
-            soundSlider.addChangeListener(e -> SoundManager.setSoundVolume(soundSlider.getValue()));
-            soundPanel.add(soundSlider);
-            panel.add(soundPanel);
-        }
-    }
-
     private static void styleButton(JButton button, Color color) {
         button.setFont(new Font("Arial", Font.BOLD, 16));
         button.setBackground(color);
@@ -184,16 +123,10 @@ public class GameWindow extends JFrame {
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(color.brighter());
-                button.setForeground(Color.BLACK); // Garder le texte noir même au survol
-                SoundManager.playSound("/button_hover.wav");
-            }
-            @Override
+
             public void mouseExited(MouseEvent e) {
                 button.setBackground(color);
-                button.setForeground(Color.BLACK); // Garder le texte noir
+                button.setForeground(Color.BLACK);
             }
         });
     }

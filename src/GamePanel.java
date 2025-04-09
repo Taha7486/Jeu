@@ -19,8 +19,7 @@ public class GamePanel extends JPanel {
     private final Image background;
     private int backgroundY = 0;
     private int scrollSpeed = 2;
-    private ChatPanel chatPanel;
-    private boolean chatVisible = false;
+
 
     private final LevelManager levelManager;
     private boolean isLevelTransition = false;
@@ -44,10 +43,6 @@ public class GamePanel extends JPanel {
         this.playerLifeIcon = ResourceManager.getImage("ship_" + shipType + ".png")
                 .getScaledInstance(30, 36, Image.SCALE_SMOOTH);
 
-        this.chatPanel = new ChatPanel();
-        this.chatPanel.setVisible(false);
-        setLayout(new OverlayLayout(this));
-        add(chatPanel);
 
         setFocusable(true);
         setupKeyListeners();
@@ -84,7 +79,7 @@ public class GamePanel extends JPanel {
         if (e.getKeyCode() == KeyEvent.VK_SPACE && player.canShoot()) {
             projectiles.add(new Projectile(player.getCenterX(), player.getY()));
             player.shoot();
-            SoundManager.playSound("/shoot.wav");
+
         } else if (isMovementKey(e.getKeyCode())) {
             player.handleKeyPress(e.getKeyCode());
         } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
@@ -105,7 +100,6 @@ public class GamePanel extends JPanel {
             repaint();
         });
         gameTimer.start();
-        SoundManager.playSound("/game_start.wav");
     }
 
     private void updateGame() {
@@ -137,7 +131,6 @@ public class GamePanel extends JPanel {
         if (levelManager.isLevelCompleted()) {
             isLevelTransition = true;
             transitionStartTime = System.currentTimeMillis();
-            SoundManager.playSound("level_up.wav");
         }
     }
 
@@ -171,9 +164,6 @@ public class GamePanel extends JPanel {
                         score += (enemy.getType() == 0) ? 10 :
                                 (enemy.getType() == 1) ? 15 : 30;
                         levelManager.enemyDefeated();
-                        SoundManager.playSound("/explosion.wav");
-                    } else {
-                        SoundManager.playSound("/hit.wav");
                     }
                 }
             });
@@ -185,10 +175,8 @@ public class GamePanel extends JPanel {
             if (enemy.isAlive() && enemy.getHitbox().intersects(player.getHitbox())) {
                 enemy.takeDamage(enemy.getMaxHealth()); // Changed from getHealth() to getMaxHealth()
                 player.takeDamage();
-                SoundManager.playSound("/player_hit.wav");
                 if (player.getHealth() <= 0) {
                     gameOver = true;
-                    SoundManager.playSound("/game_over.wav");
                     DatabaseManager.saveGameResult(
                             playerName,
                             score,

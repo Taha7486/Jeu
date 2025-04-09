@@ -10,9 +10,7 @@ public class Enemy {
     private int type;
     private int health;
     private int maxHealth;
-    public int getHealth() {
-        return health;
-    }
+
     public int getMaxHealth() {
         return maxHealth;
     }
@@ -88,7 +86,5 @@ public class Enemy {
     }
 
     public boolean isAlive() { return alive; }
-    public int getX() { return x; }
-    public int getY() { return y; }
     public int getType() { return type; }
 }

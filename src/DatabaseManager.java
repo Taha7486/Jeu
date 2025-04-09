@@ -63,21 +63,5 @@ public class DatabaseManager {
         return scores;
     }
 
-    public static void initializeDatabase() {
-        String sql = "CREATE TABLE IF NOT EXISTS game_results (" +
-                "id INT AUTO_INCREMENT PRIMARY KEY, " +
-                "player_name VARCHAR(50) NOT NULL, " +
-                "score INT NOT NULL, " +
-                "level INT NOT NULL, " +
-                "difficulty VARCHAR(20) NOT NULL, " +
-                "achieved_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
-                ")";
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
-             Statement stmt = conn.createStatement()) {
-            stmt.execute(sql);
-        } catch (SQLException e) {
-            System.err.println("Error creating table: " + e.getMessage());
-        }
-    }
 }

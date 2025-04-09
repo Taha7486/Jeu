@@ -1,4 +1,3 @@
-// Projectile.java
 import java.awt.*;
 
 public class Projectile {
