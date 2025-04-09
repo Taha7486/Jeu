@@ -1,9 +1,6 @@
 
-import javax.sound.sampled.Clip;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
@@ -142,8 +139,6 @@ public class MenuPanel extends JPanel {
 
         return button;
     }
-
-
 
     private void startGame() {
         String playerName = "Player1"; // Default name

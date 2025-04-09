@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -231,6 +232,7 @@ public class GamePanel extends JPanel {
                     getWidth() / 2 - g.getFontMetrics().stringWidth(message) / 2,
                     getHeight() / 2);
         }
+        drawChatBox(g);
 
         // Game Over
         if (gameOver) {
@@ -305,5 +307,45 @@ public class GamePanel extends JPanel {
         for (int i = 0; i < Math.min(5, highscores.size()); i++) {
             g.drawString(highscores.get(i), 50, getHeight() / 2 + 130 + i * 25);
         }
+    }
+
+    private final List<String> chatMessages = Arrays.asList(
+            "Joueur1: Salut !",
+            "Joueur2: Ça va ?",
+            "Joueur1: Prêt pour la mission !"
+    );
+
+    private void drawChatBox(Graphics g) {
+        Graphics2D g2d = (Graphics2D)g;
+
+        // Fond semi-transparent
+        g2d.setColor(new Color(0, 0, 0, 150)); // Noir semi-transparent
+        g2d.fillRoundRect(
+                getWidth() - 210,       // Position X (coin droit)
+                getHeight() - 150,      // Position Y (en bas)
+                200,                    // Largeur
+                140,                    // Hauteur
+                15,                     // Arrondi des coins
+                15
+        );
+
+        // Bordure
+        g2d.setColor(new Color(255, 255, 255, 100)); // Bordure blanche
+        g2d.setStroke(new BasicStroke(2));
+        g2d.drawRoundRect(getWidth() - 210, getHeight() - 150, 200, 140, 15, 15);
+
+        // Texte du chat
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        // Affichage des messages
+        int yPos = getHeight() - 130;
+        for (String message : chatMessages) {
+            g2d.drawString(message, getWidth() - 200, yPos);
+            yPos += 20; // Espacement entre lignes
+        }
+
+        // Indicateur de chat (simulation)
+        g2d.drawString("Chat (T pour écrire)", getWidth() - 200, getHeight() - 30);
     }
 }
