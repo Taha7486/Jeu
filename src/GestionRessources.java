@@ -1,6 +1,4 @@
-
 import javax.imageio.ImageIO;
-import javax.sound.sampled.Clip;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -8,7 +6,6 @@ import java.util.Map;
 
 public class GestionRessources {
     private static final Map<String, Image> images = new HashMap<>();
-    private static final Map<String, Clip> sounds = new HashMap<>();
 
     public static void preloadResources() {
         loadImage("/background.png");
@@ -18,7 +15,6 @@ public class GestionRessources {
             loadImage("/ship_" + i + ".png");
             loadImage("/enemy_" + (i == 0 ? "basic" : i == 1 ? "fast" : "tank") + ".png");
         }
-
     }
 
     public static Image getImage(String filename) {
@@ -28,17 +24,15 @@ public class GestionRessources {
         return images.getOrDefault(filename, createPlaceholderImage());
     }
 
-
     private static void loadImage(String filename) {
         try {
-            BufferedImage image = ImageIO.read(GestionRessources.class.getResourceAsStream( filename));
+            BufferedImage image = ImageIO.read(GestionRessources.class.getResourceAsStream(filename));
             images.put(filename, image);
         } catch (Exception e) {
             System.err.println("Could not load image: " + filename);
             images.put(filename, createPlaceholderImage());
         }
     }
-
 
     private static Image createPlaceholderImage() {
         BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);

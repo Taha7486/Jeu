@@ -1,12 +1,13 @@
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Point2D;
 
 public class MenuPrincipal extends JPanel {
     private final FenetreJeu parent;
     private JCheckBox multiplayerCheckbox;
+
     public MenuPrincipal(FenetreJeu parent) {
         this.parent = parent;
         setLayout(new GridBagLayout());
@@ -27,7 +28,7 @@ public class MenuPrincipal extends JPanel {
     }
 
     private void addTitle(GridBagConstraints gbc) {
-        JLabel title = new JLabel("Space Shooter", JLabel.CENTER);
+        JLabel title = new JLabel("Space Defender", JLabel.CENTER);
         title.setFont(new Font("Arial", Font.BOLD, 48));
         title.setForeground(new Color(255, 215, 0));
         title.setBorder(BorderFactory.createEmptyBorder(0, 0, 30, 0));
@@ -48,13 +49,14 @@ public class MenuPrincipal extends JPanel {
         gbcOptions.anchor = GridBagConstraints.LINE_START;
 
         addPlayerNameField(optionsPanel, gbcOptions);
-        addMultiplayerCheckbox(optionsPanel, gbcOptions); // Nouvelle méthode
+        addMultiplayerCheckbox(optionsPanel, gbcOptions);
         addDifficultyCombo(optionsPanel, gbcOptions);
         addShipCombo(optionsPanel, gbcOptions);
     }
+
     private void addMultiplayerCheckbox(JPanel panel, GridBagConstraints gbc) {
         gbc.gridy++;
-        multiplayerCheckbox = new JCheckBox("Multijoueur");
+        multiplayerCheckbox = new JCheckBox("Two-Player Mode (Local)");
         multiplayerCheckbox.setForeground(Color.WHITE);
         multiplayerCheckbox.setOpaque(false);
         panel.add(multiplayerCheckbox, gbc);
@@ -81,7 +83,7 @@ public class MenuPrincipal extends JPanel {
         panel.add(levelLabel, gbc);
 
         gbc.gridy++;
-        String[] levels = {"Easy", "Normal", "Hard", "Extreme"};
+        String[] levels = {"Easy", "Normal", "Hard"};
         JComboBox<String> levelCombo = new JComboBox<>(levels);
         levelCombo.setFont(new Font("Arial", Font.PLAIN, 14));
         levelCombo.setSelectedIndex(1);
@@ -96,11 +98,7 @@ public class MenuPrincipal extends JPanel {
         panel.add(shipLabel, gbc);
 
         gbc.gridy++;
-        String[] ships = {
-                "Standard ",
-                "Fast  ",
-                "Heavy  "
-        };
+        String[] ships = {"Standard", "Fast", "Heavy"};
         JComboBox<String> shipCombo = new JComboBox<>(ships);
         shipCombo.setFont(new Font("Arial", Font.PLAIN, 14));
         panel.add(shipCombo, gbc);
@@ -167,18 +165,9 @@ public class MenuPrincipal extends JPanel {
                 JComboBox<?> combo = (JComboBox<?>) comp;
                 if (combo.getItemAt(0).toString().equals("Easy")) {
                     switch (combo.getSelectedIndex()) {
-                        case 0:
-                            difficulty = 1;
-                            break;
-                        case 1:
-                            difficulty = 3;
-                            break;
-                        case 2:
-                            difficulty = 5;
-                            break;
-                        case 3:
-                            difficulty = 7;
-                            break;
+                        case 0: difficulty = 1; break;
+                        case 1: difficulty = 3; break;
+                        case 2: difficulty = 5; break;
                     }
                 }
             }
@@ -206,45 +195,42 @@ public class MenuPrincipal extends JPanel {
         drawStarBackground(g);
     }
 
-private void drawStarBackground(Graphics g) {
-    Graphics2D g2d = (Graphics2D) g;
+    private void drawStarBackground(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
 
-    // Create a radial gradient for a nebula effect
-    Point center = new Point(getWidth() / 2, getHeight() / 2);
-    float radius = Math.max(getWidth(), getHeight()) * 0.8f;
-    float[] fractions = {0.1f, 0.4f, 0.7f, 1.0f};
-    Color[] colors = {
-            new Color(10, 0, 30),     // Deep purple
-            new Color(50, 0, 80),     // Cosmic violet
-            new Color(20, 10, 60),    // Space blue
-            new Color(5, 0, 20)       // Dark void
-    };
+        // Create a radial gradient for a nebula effect
+        Point center = new Point(getWidth() / 2, getHeight() / 2);
+        float radius = Math.max(getWidth(), getHeight()) * 0.8f;
+        float[] fractions = {0.1f, 0.4f, 0.7f, 1.0f};
+        Color[] colors = {
+                new Color(10, 0, 30),     // Deep purple
+                new Color(50, 0, 80),     // Cosmic violet
+                new Color(20, 10, 60),    // Space blue
+                new Color(5, 0, 20)       // Dark void
+        };
 
-    RadialGradientPaint gradient = new RadialGradientPaint(
-            center, radius, fractions, colors
-    );
+        RadialGradientPaint gradient = new RadialGradientPaint(
+                center, radius, fractions, colors
+        );
 
-    g2d.setPaint(gradient);
-    g2d.fillRect(0, 0, getWidth(), getHeight());
+        g2d.setPaint(gradient);
+        g2d.fillRect(0, 0, getWidth(), getHeight());
 
-    // Add subtle twinkling stars (fewer than before)
-    g2d.setColor(Color.WHITE);
-    for (int i = 0; i < 30; i++) {
-        int x = (int) (Math.random() * getWidth());
-        int y = (int) (Math.random() * getHeight());
-        int size = 1 + (int) (Math.random() * 2);
-        g2d.fillOval(x, y, size, size);
+        // Add subtle twinkling stars
+        g2d.setColor(Color.WHITE);
+        for (int i = 0; i < 100; i++) {
+            int x = (int) (Math.random() * getWidth());
+            int y = (int) (Math.random() * getHeight());
+            int size = 1 + (int) (Math.random() * 2);
+            g2d.fillOval(x, y, size, size);
+        }
+
+        // Add a faint galaxy spiral
+        g2d.setColor(new Color(70, 40, 120, 50));
+        for (int i = 0; i < 5; i++) {
+            int spiralX = center.x + (int) (Math.cos(i * 0.5) * i * 30);
+            int spiralY = center.y + (int) (Math.sin(i * 0.5) * i * 30);
+            g2d.fillOval(spiralX, spiralY, 200 - i * 30, 200 - i * 30);
+        }
     }
-
-    // Add a faint galaxy spiral
-    g2d.setColor(new Color(70, 40, 120, 50));
-    for (int i = 0; i < 5; i++) {
-        int spiralX = center.x + (int) (Math.cos(i * 0.5) * i * 30);
-        int spiralY = center.y + (int) (Math.sin(i * 0.5) * i * 30);
-        g2d.fillOval(spiralX, spiralY, 200 - i * 30, 200 - i * 30);
-    }
-}
-
-
-
 }

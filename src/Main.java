@@ -4,10 +4,8 @@ public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             GestionRessources.preloadResources();
-
             FenetreJeu window = new FenetreJeu();
             window.setLocationRelativeTo(null);
-
         });
     }
 }

@@ -3,7 +3,6 @@ import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -11,10 +10,12 @@ public class Bouclejeu extends JPanel {
     private final List<Projectile> projectiles = new ArrayList<>();
     private final List<Enemy> enemies = new ArrayList<>();
     private int score = 0;
+    private int player2Score = 0;
     private final Random random = new Random();
     private int spawnTimer = 0;
 
-    private Joueur player; // Changé de final à non-final
+    private Joueur player;
+    private Joueur player2;
     private final Image background;
     private int backgroundY = 0;
     private int scrollSpeed = 2;
@@ -23,11 +24,14 @@ public class Bouclejeu extends JPanel {
     private long transitionStartTime;
     private boolean gameOver = false;
     private final Image playerLifeIcon;
+    private final Image player2LifeIcon;
     private final String playerName;
+    private final String player2Name = "Player2";
     private final int initialDifficulty;
     private final FenetreJeu parent;
     private ClientManager clientManager;
     private boolean isMultiplayer = false;
+    private boolean isTwoPlayerMode = false;
     private String serverAddress = "localhost";
     private Timer gameTimer;
     private final List<String> chatMessages = new ArrayList<>();
@@ -37,11 +41,13 @@ public class Bouclejeu extends JPanel {
         this.playerName = playerName;
         this.initialDifficulty = difficulty;
         this.isMultiplayer = isMultiplayer;
+        this.isTwoPlayerMode = isMultiplayer;
         this.pp = new Gestionniveux(difficulty);
 
-        // Initialisation des ressources qui ne dépendent pas de la connexion
         this.background = GestionRessources.getImage("/background.png");
         this.playerLifeIcon = GestionRessources.getImage("/ship_" + shipType + ".png")
+                .getScaledInstance(30, 36, Image.SCALE_SMOOTH);
+        this.player2LifeIcon = GestionRessources.getImage("/ship_" + shipType + ".png")
                 .getScaledInstance(30, 36, Image.SCALE_SMOOTH);
 
         if (isMultiplayer) {
@@ -53,8 +59,10 @@ public class Bouclejeu extends JPanel {
             }
         }
 
-        // Initialisation du joueur après avoir vérifié la connexion
-        this.player = new Joueur(380, 450, shipType);
+        this.player = new Joueur(300, 450, shipType, true);
+        if (isTwoPlayerMode) {
+            this.player2 = new Joueur(500, 450, shipType, false);
+        }
 
         setFocusable(true);
         setupKeyListeners();
@@ -67,7 +75,7 @@ public class Bouclejeu extends JPanel {
             if (isMultiplayer) {
                 clientManager.sendMessage(message);
             } else {
-                addChatMessage("Vous: " + message);
+                addChatMessage(playerName + ": " + message);
             }
         }
     }
@@ -91,6 +99,9 @@ public class Bouclejeu extends JPanel {
                 if (isMovementKey(e.getKeyCode())) {
                     player.handleKeyRelease(e.getKeyCode());
                 }
+                if (isTwoPlayerMode && isPlayer2MovementKey(e.getKeyCode())) {
+                    handlePlayer2KeyRelease(e.getKeyCode());
+                }
             }
         });
     }
@@ -105,19 +116,69 @@ public class Bouclejeu extends JPanel {
             return;
         }
 
+        // Player 1 controls
         if (e.getKeyCode() == KeyEvent.VK_SPACE && player.canShoot()) {
-            projectiles.add(new Projectile(player.getCenterX(), player.getY()));
+            projectiles.add(new Projectile(player.getCenterX(), player.getY(), true));
             player.shoot();
         } else if (isMovementKey(e.getKeyCode())) {
             player.handleKeyPress(e.getKeyCode());
+        }
+
+        // Player 2 controls (only in two-player mode)
+        if (isTwoPlayerMode) {
+            if (e.getKeyCode() == KeyEvent.VK_ENTER && player2.canShoot()) {
+                projectiles.add(new Projectile(player2.getCenterX(), player2.getY(), false));
+                player2.shoot();
+            } else if (isPlayer2MovementKey(e.getKeyCode())) {
+                handlePlayer2KeyPress(e.getKeyCode());
+            }
         } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
             parent.showMenu();
+        }
+    }
+
+    private void handlePlayer2KeyPress(int keyCode) {
+        switch(keyCode) {
+            case KeyEvent.VK_A:
+                player2.handleKeyPress(KeyEvent.VK_LEFT);
+                break;
+            case KeyEvent.VK_D:
+                player2.handleKeyPress(KeyEvent.VK_RIGHT);
+                break;
+            case KeyEvent.VK_W:
+                player2.handleKeyPress(KeyEvent.VK_UP);
+                break;
+            case KeyEvent.VK_S:
+                player2.handleKeyPress(KeyEvent.VK_DOWN);
+                break;
+        }
+    }
+
+    private void handlePlayer2KeyRelease(int keyCode) {
+        switch(keyCode) {
+            case KeyEvent.VK_A:
+                player2.handleKeyRelease(KeyEvent.VK_LEFT);
+                break;
+            case KeyEvent.VK_D:
+                player2.handleKeyRelease(KeyEvent.VK_RIGHT);
+                break;
+            case KeyEvent.VK_W:
+                player2.handleKeyRelease(KeyEvent.VK_UP);
+                break;
+            case KeyEvent.VK_S:
+                player2.handleKeyRelease(KeyEvent.VK_DOWN);
+                break;
         }
     }
 
     private boolean isMovementKey(int keyCode) {
         return keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_RIGHT ||
                 keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN;
+    }
+
+    private boolean isPlayer2MovementKey(int keyCode) {
+        return keyCode == KeyEvent.VK_A || keyCode == KeyEvent.VK_D ||
+                keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_S;
     }
 
     private void startGameLoop() {
@@ -141,6 +202,9 @@ public class Bouclejeu extends JPanel {
         }
 
         player.update();
+        if (isTwoPlayerMode) {
+            player2.update();
+        }
         updateBackground();
 
         if (++spawnTimer >= pp.getAdjustedSpawnInterval()) {
@@ -171,7 +235,7 @@ public class Bouclejeu extends JPanel {
 
     private void spawnEnemy() {
         int baseSpeed = pp.getEnemySpeed();
-        int type = random.nextInt(3); // 0: basic, 1: fast, 2: tank
+        int type = random.nextInt(3);
         enemies.add(new Enemy(
                 random.nextInt(getWidth() - 50),
                 -50,
@@ -188,8 +252,15 @@ public class Bouclejeu extends JPanel {
                     projectile.setActive(false);
 
                     if (!enemy.isAlive()) {
-                        score += (enemy.getType() == 0) ? 10 :
+                        int points = (enemy.getType() == 0) ? 10 :
                                 (enemy.getType() == 1) ? 15 : 30;
+
+                        if (projectile.isPlayer1Projectile()) {
+                            score += points;
+                        } else {
+                            player2Score += points;
+                        }
+
                         pp.enemyDefeated();
                     }
                 }
@@ -202,15 +273,37 @@ public class Bouclejeu extends JPanel {
                 player.takeDamage();
                 if (player.getHealth() <= 0) {
                     gameOver = true;
-                    GestionBaseDonnees.saveGameResult(
-                            playerName,
-                            score,
-                            pp.getCurrentLevel(),
-                            getDifficultyString(initialDifficulty)
-                    );
+                    saveGameResults();
+                }
+            }
+
+            if (isTwoPlayerMode && enemy.isAlive() && enemy.getHitbox().intersects(player2.getHitbox())) {
+                enemy.takeDamage(enemy.getMaxHealth());
+                player2.takeDamage();
+                if (player2.getHealth() <= 0 && !gameOver) {
+                    gameOver = true;
+                    saveGameResults();
                 }
             }
         });
+    }
+
+    private void saveGameResults() {
+        GestionBaseDonnees.saveGameResult(
+                playerName,
+                score,
+                pp.getCurrentLevel(),
+                getDifficultyString(initialDifficulty)
+        );
+
+        if (isTwoPlayerMode) {
+            GestionBaseDonnees.saveGameResult(
+                    player2Name,
+                    player2Score,
+                    pp.getCurrentLevel(),
+                    getDifficultyString(initialDifficulty)
+            );
+        }
     }
 
     private void resetGame() {
@@ -241,8 +334,14 @@ public class Bouclejeu extends JPanel {
         enemies.forEach(e -> e.draw(g));
         projectiles.forEach(p -> p.draw(g));
         player.draw(g);
+        if (isTwoPlayerMode) {
+            player2.draw(g);
+        }
 
         drawLives(g);
+        if (isTwoPlayerMode) {
+            drawPlayer2Lives(g);
+        }
 
         // Level transition
         if (isLevelTransition) {
@@ -266,21 +365,37 @@ public class Bouclejeu extends JPanel {
 
     private void drawLives(Graphics g) {
         int x = 20;
-        int y = 40;  // Moved from bottom to top
+        int y = 40;
 
-        // Optional: Add a subtle background for better visibility
         g.setColor(new Color(0, 0, 0, 150));
         g.fillRoundRect(x - 5, y - 25,
-                player.getHealth() * 25 + 10,  // Dynamic width based on lives
+                player.getHealth() * 25 + 10,
                 50, 10, 10);
 
-        // Redraw the elements on top of the background
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.BOLD, 14));
-        g.drawString("Difficulty: " + getDifficultyString(initialDifficulty), x, y - 10);
+        g.drawString(playerName + ": " + score, x, y - 10);
 
         for (int i = 0; i < player.getHealth(); i++) {
             g.drawImage(playerLifeIcon, x + (i * 25), y + 5, 25, 30, null);
+        }
+    }
+
+    private void drawPlayer2Lives(Graphics g) {
+        int x = getWidth() - 220;
+        int y = 40;
+
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fillRoundRect(x - 5, y - 25,
+                player2.getHealth() * 25 + 10,
+                50, 10, 10);
+
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.drawString(player2Name + ": " + player2Score, x, y - 10);
+
+        for (int i = 0; i < player2.getHealth(); i++) {
+            g.drawImage(player2LifeIcon, x + (i * 25), y + 5, 25, 30, null);
         }
     }
 
@@ -294,9 +409,11 @@ public class Bouclejeu extends JPanel {
     }
 
     private void drawGameOverScreen(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+
         // Dark semi-transparent overlay
-        g.setColor(new Color(0, 0, 0, 180));
-        g.fillRect(0, 0, getWidth(), getHeight());
+        g2d.setColor(new Color(0, 0, 0, 180));
+        g2d.fillRect(0, 0, getWidth(), getHeight());
 
         // Main game over panel
         int panelWidth = 600;
@@ -305,7 +422,6 @@ public class Bouclejeu extends JPanel {
         int panelY = (getHeight() - panelHeight) / 2;
 
         // Panel background with border
-        Graphics2D g2d = (Graphics2D) g;
         g2d.setColor(new Color(40, 40, 60));
         g2d.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 20, 20);
         g2d.setColor(new Color(100, 100, 150));
@@ -324,43 +440,42 @@ public class Bouclejeu extends JPanel {
                 panelX + (panelWidth - g2d.getFontMetrics().stringWidth(title)) / 2,
                 panelY + 60);
 
+        // Determine winner in two-player mode
+        if (isTwoPlayerMode) {
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.BOLD, 36));
+            String winnerText;
+            if (score > player2Score) {
+                winnerText = playerName + " WINS!";
+            } else if (player2Score > score) {
+                winnerText = player2Name + " WINS!";
+            } else {
+                winnerText = "DRAW!";
+            }
+            g2d.drawString(winnerText,
+                    panelX + (panelWidth - g2d.getFontMetrics().stringWidth(winnerText)) / 2,
+                    panelY + 110);
+        }
+
         // Score display
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 28));
-        String scoreText = "YOUR SCORE: " + score;
+        String scoreText = playerName + ": " + score;
         g2d.drawString(scoreText,
                 panelX + (panelWidth - g2d.getFontMetrics().stringWidth(scoreText)) / 2,
-                panelY + 110);
+                panelY + (isTwoPlayerMode ? 150 : 110));
 
-        // Player stats
-        g2d.setFont(new Font("Arial", Font.PLAIN, 20));
-        String levelText = "Level Reached: " + pp.getCurrentLevel();
-        String difficultyText = "Difficulty: " + getDifficultyString(initialDifficulty);
-
-        g2d.drawString(levelText, panelX + 50, panelY + 160);
-        g2d.drawString(difficultyText, panelX + panelWidth - 250, panelY + 160);
-
-        // High scores section
-        g2d.setColor(new Color(200, 200, 255));
-        g2d.setFont(new Font("Arial", Font.BOLD, 24));
-        g2d.drawString("TOP SCORES", panelX + 50, panelY + 200);
-
-        g2d.setColor(Color.WHITE);
-        g2d.setStroke(new BasicStroke(1));
-        g2d.drawLine(panelX + 50, panelY + 210, panelX + panelWidth - 50, panelY + 210);
-
-        List<String> highscores = GestionBaseDonnees.getHighScores(5);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
-
-        for (int i = 0; i < highscores.size(); i++) {
-            String entry = String.format("%d. %s", i+1, highscores.get(i));
-            g2d.drawString(entry, panelX + 60, panelY + 240 + i * 30);
+        if (isTwoPlayerMode) {
+            String score2Text = player2Name + ": " + player2Score;
+            g2d.drawString(score2Text,
+                    panelX + (panelWidth - g2d.getFontMetrics().stringWidth(score2Text)) / 2,
+                    panelY + 190);
         }
 
         // Continue prompt
         g2d.setColor(new Color(150, 255, 150));
         g2d.setFont(new Font("Arial", Font.BOLD, 22));
-        String continueText = "Press Espace to return to menu";
+        String continueText = "Press SPACE to return to menu";
         g2d.drawString(continueText,
                 panelX + (panelWidth - g2d.getFontMetrics().stringWidth(continueText)) / 2,
                 panelY + panelHeight - 40);
@@ -369,7 +484,7 @@ public class Bouclejeu extends JPanel {
     private void drawChatBox(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
 
-        // Fond semi-transparent
+        // Semi-transparent background
         g2d.setColor(new Color(0, 0, 0, 150));
         g2d.fillRoundRect(
                 getWidth() - 210,
@@ -380,16 +495,16 @@ public class Bouclejeu extends JPanel {
                 15
         );
 
-        // Bordure
+        // Border
         g2d.setColor(new Color(255, 255, 255, 100));
         g2d.setStroke(new BasicStroke(2));
         g2d.drawRoundRect(getWidth() - 210, getHeight() - 150, 200, 140, 15, 15);
 
-        // Texte du chat
+        // Chat text
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.PLAIN, 12));
 
-        // Affichage des messages
+        // Display messages
         int yPos = getHeight() - 130;
         List<String> messages = isMultiplayer ?
                 clientManager.getChatMessages() : chatMessages;
@@ -399,7 +514,7 @@ public class Bouclejeu extends JPanel {
             yPos += 20;
         }
 
-        // Indicateur de chat
-        g2d.drawString("Chat (T pour écrire)", getWidth() - 200, getHeight() - 30);
+        // Chat indicator
+        g2d.drawString("Chat (T to write)", getWidth() - 200, getHeight() - 30);
     }
 }
