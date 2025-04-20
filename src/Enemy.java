@@ -22,28 +22,28 @@ public class Enemy {
 
         switch(type) {
             case 0: // Basic
-                this.image = ResourceManager.getImage("/enemy_basic.png");
+                this.image = GestionRessources.getImage("/enemy_basic.png");
                 this.width = 40;
                 this.height = 40;
                 this.speedY = baseSpeed;
                 this.health = 1;
                 break;
             case 1: // Fast
-                this.image = ResourceManager.getImage("/enemy_fast.png");
+                this.image = GestionRessources.getImage("/enemy_fast.png");
                 this.width = 30;
                 this.height = 30;
                 this.speedY = baseSpeed + 2;
                 this.health = 1;
                 break;
             case 2: // Tank
-                this.image = ResourceManager.getImage("/enemy_tank.png");
+                this.image = GestionRessources.getImage("/enemy_tank.png");
                 this.width = 50;
                 this.height = 50;
                 this.speedY = baseSpeed - 1;
                 this.health = 3;
                 break;
             default:
-                this.image = ResourceManager.getImage("/enemy_basic.png");
+                this.image = GestionRessources.getImage("/enemy_basic.png");
                 this.width = 40;
                 this.height = 40;
                 this.speedY = baseSpeed;

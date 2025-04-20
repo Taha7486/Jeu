@@ -3,9 +3,9 @@ import javax.swing.*;
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            ResourceManager.preloadResources();
+            GestionRessources.preloadResources();
 
-            GameWindow window = new GameWindow();
+            FenetreJeu window = new FenetreJeu();
             window.setLocationRelativeTo(null);
 
         });
