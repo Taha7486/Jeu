@@ -14,7 +14,7 @@ public class Bouclejeu extends JPanel {
     private final Random random = new Random();
     private int spawnTimer = 0;
 
-    private final Joueur player;
+    private Joueur player; // Changé de final à non-final
     private final Image background;
     private int backgroundY = 0;
     private int scrollSpeed = 2;
@@ -26,24 +26,57 @@ public class Bouclejeu extends JPanel {
     private final String playerName;
     private final int initialDifficulty;
     private final FenetreJeu parent;
-
+    private ClientManager clientManager;
+    private boolean isMultiplayer = false;
+    private String serverAddress = "localhost";
     private Timer gameTimer;
+    private final List<String> chatMessages = new ArrayList<>();
 
-    public Bouclejeu(FenetreJeu parent, String playerName, int difficulty, int shipType) {
+    public Bouclejeu(FenetreJeu parent, String playerName, int difficulty, int shipType, boolean isMultiplayer) {
         this.parent = parent;
         this.playerName = playerName;
         this.initialDifficulty = difficulty;
+        this.isMultiplayer = isMultiplayer;
         this.pp = new Gestionniveux(difficulty);
 
+        // Initialisation des ressources qui ne dépendent pas de la connexion
         this.background = GestionRessources.getImage("/background.png");
-        this.player = new Joueur(380, 450, shipType);
-        this.playerLifeIcon = GestionRessources.getImage("ship_" + shipType + ".png")
+        this.playerLifeIcon = GestionRessources.getImage("/ship_" + shipType + ".png")
                 .getScaledInstance(30, 36, Image.SCALE_SMOOTH);
 
+        if (isMultiplayer) {
+            clientManager = new ClientManager(playerName);
+            if (!clientManager.connectToServer(serverAddress)) {
+                JOptionPane.showMessageDialog(this, "Échec de connexion au serveur ou nom déjà pris", "Erreur", JOptionPane.ERROR_MESSAGE);
+                parent.showMenu();
+                return;
+            }
+        }
+
+        // Initialisation du joueur après avoir vérifié la connexion
+        this.player = new Joueur(380, 450, shipType);
 
         setFocusable(true);
         setupKeyListeners();
         startGameLoop();
+    }
+
+    private void handleChatInput() {
+        String message = JOptionPane.showInputDialog(this, "Entrez votre message:");
+        if (message != null && !message.trim().isEmpty()) {
+            if (isMultiplayer) {
+                clientManager.sendMessage(message);
+            } else {
+                addChatMessage("Vous: " + message);
+            }
+        }
+    }
+
+    private void addChatMessage(String message) {
+        chatMessages.add(message);
+        if (chatMessages.size() > 10) {
+            chatMessages.remove(0);
+        }
     }
 
     private void setupKeyListeners() {
@@ -59,15 +92,14 @@ public class Bouclejeu extends JPanel {
                     player.handleKeyRelease(e.getKeyCode());
                 }
             }
-
-            private boolean isMovementKey(int keyCode) {
-                return keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_RIGHT ||
-                        keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN;
-            }
         });
     }
 
     private void handleKeyPress(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_T) {
+            handleChatInput();
+            return;
+        }
         if (gameOver && e.getKeyCode() == KeyEvent.VK_SPACE) {
             resetGame();
             return;
@@ -76,7 +108,6 @@ public class Bouclejeu extends JPanel {
         if (e.getKeyCode() == KeyEvent.VK_SPACE && player.canShoot()) {
             projectiles.add(new Projectile(player.getCenterX(), player.getY()));
             player.shoot();
-
         } else if (isMovementKey(e.getKeyCode())) {
             player.handleKeyPress(e.getKeyCode());
         } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
@@ -167,7 +198,7 @@ public class Bouclejeu extends JPanel {
 
         new ArrayList<>(enemies).forEach(enemy -> {
             if (enemy.isAlive() && enemy.getHitbox().intersects(player.getHitbox())) {
-                enemy.takeDamage(enemy.getMaxHealth()); // Changed from getHealth() to getMaxHealth()
+                enemy.takeDamage(enemy.getMaxHealth());
                 player.takeDamage();
                 if (player.getHealth() <= 0) {
                     gameOver = true;
@@ -186,8 +217,6 @@ public class Bouclejeu extends JPanel {
         if (gameTimer != null) {
             gameTimer.stop();
         }
-
-
         parent.showMenu();
     }
 
@@ -195,8 +224,12 @@ public class Bouclejeu extends JPanel {
         if (gameTimer != null) {
             gameTimer.stop();
         }
+        if (isMultiplayer && clientManager != null) {
+            clientManager.disconnect();
+        }
     }
 
+    @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
@@ -208,7 +241,6 @@ public class Bouclejeu extends JPanel {
         enemies.forEach(e -> e.draw(g));
         projectiles.forEach(p -> p.draw(g));
         player.draw(g);
-
 
         drawLives(g);
 
@@ -223,6 +255,7 @@ public class Bouclejeu extends JPanel {
                     getWidth() / 2 - g.getFontMetrics().stringWidth(message) / 2,
                     getHeight() / 2);
         }
+
         drawChatBox(g);
 
         // Game Over
@@ -331,32 +364,24 @@ public class Bouclejeu extends JPanel {
         g2d.drawString(continueText,
                 panelX + (panelWidth - g2d.getFontMetrics().stringWidth(continueText)) / 2,
                 panelY + panelHeight - 40);
-
-
     }
 
-    private final List<String> chatMessages = Arrays.asList(
-            "Joueur1: Salut !",
-            "Joueur2: Ça va ?",
-            "Joueur1: Prêt pour la mission !"
-    );
-
     private void drawChatBox(Graphics g) {
-        Graphics2D g2d = (Graphics2D)g;
+        Graphics2D g2d = (Graphics2D) g;
 
         // Fond semi-transparent
-        g2d.setColor(new Color(0, 0, 0, 150)); // Noir semi-transparent
+        g2d.setColor(new Color(0, 0, 0, 150));
         g2d.fillRoundRect(
-                getWidth() - 210,       // Position X (coin droit)
-                getHeight() - 150,      // Position Y (en bas)
-                200,                    // Largeur
-                140,                    // Hauteur
-                15,                     // Arrondi des coins
+                getWidth() - 210,
+                getHeight() - 150,
+                200,
+                140,
+                15,
                 15
         );
 
         // Bordure
-        g2d.setColor(new Color(255, 255, 255, 100)); // Bordure blanche
+        g2d.setColor(new Color(255, 255, 255, 100));
         g2d.setStroke(new BasicStroke(2));
         g2d.drawRoundRect(getWidth() - 210, getHeight() - 150, 200, 140, 15, 15);
 
@@ -366,12 +391,15 @@ public class Bouclejeu extends JPanel {
 
         // Affichage des messages
         int yPos = getHeight() - 130;
-        for (String message : chatMessages) {
+        List<String> messages = isMultiplayer ?
+                clientManager.getChatMessages() : chatMessages;
+
+        for (String message : messages) {
             g2d.drawString(message, getWidth() - 200, yPos);
-            yPos += 20; // Espacement entre lignes
+            yPos += 20;
         }
 
-        // Indicateur de chat (simulation)
+        // Indicateur de chat
         g2d.drawString("Chat (T pour écrire)", getWidth() - 200, getHeight() - 30);
     }
 }

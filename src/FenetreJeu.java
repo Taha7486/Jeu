@@ -1,4 +1,3 @@
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -20,7 +19,7 @@ public class FenetreJeu extends JFrame {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
-            System.err.println("Couldn't set system ");
+            System.err.println("Couldn't set system look and feel: " + e.getMessage());
         }
 
         showMenu();
@@ -33,9 +32,9 @@ public class FenetreJeu extends JFrame {
         switchToPanel(menuPanel);
     }
 
-    public void startGame(String playerName, int difficulty, int shipType) {
+    public void startGame(String playerName, int difficulty, int shipType, boolean isMultiplayer) {
         cleanUpCurrentPanel();
-        gamePanel = new Bouclejeu(this, playerName, difficulty, shipType);
+        gamePanel = new Bouclejeu(this, playerName, difficulty, shipType, isMultiplayer);
         switchToPanel(gamePanel);
     }
 
@@ -59,7 +58,6 @@ public class FenetreJeu extends JFrame {
             remove(highscorePanel);
             highscorePanel = null;
         }
-
     }
 
     private void switchToPanel(JPanel panel) {
@@ -117,13 +115,19 @@ public class FenetreJeu extends JFrame {
     private static void styleButton(JButton button, Color color) {
         button.setFont(new Font("Arial", Font.BOLD, 16));
         button.setBackground(color);
-        button.setForeground(Color.BLACK); // Changé de WHITE à BLACK
+        button.setForeground(Color.BLACK);
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(10, 25, 10, 25));
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(color.brighter());
+                button.setForeground(Color.WHITE);
+            }
 
+            @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(color);
                 button.setForeground(Color.BLACK);

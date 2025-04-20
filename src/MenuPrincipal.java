@@ -6,7 +6,7 @@ import java.awt.event.MouseEvent;
 
 public class MenuPrincipal extends JPanel {
     private final FenetreJeu parent;
-
+    private JCheckBox multiplayerCheckbox;
     public MenuPrincipal(FenetreJeu parent) {
         this.parent = parent;
         setLayout(new GridBagLayout());
@@ -48,8 +48,16 @@ public class MenuPrincipal extends JPanel {
         gbcOptions.anchor = GridBagConstraints.LINE_START;
 
         addPlayerNameField(optionsPanel, gbcOptions);
+        addMultiplayerCheckbox(optionsPanel, gbcOptions); // Nouvelle méthode
         addDifficultyCombo(optionsPanel, gbcOptions);
         addShipCombo(optionsPanel, gbcOptions);
+    }
+    private void addMultiplayerCheckbox(JPanel panel, GridBagConstraints gbc) {
+        gbc.gridy++;
+        multiplayerCheckbox = new JCheckBox("Multijoueur");
+        multiplayerCheckbox.setForeground(Color.WHITE);
+        multiplayerCheckbox.setOpaque(false);
+        panel.add(multiplayerCheckbox, gbc);
     }
 
     private void addPlayerNameField(JPanel panel, GridBagConstraints gbc) {
@@ -141,14 +149,17 @@ public class MenuPrincipal extends JPanel {
     }
 
     private void startGame() {
-        String playerName = "Player1"; // Default name
+        String playerName = "Player1";
         Component[] components = ((JPanel) getComponent(1)).getComponents();
+
         for (Component comp : components) {
             if (comp instanceof JTextField) {
                 playerName = ((JTextField) comp).getText().trim();
                 if (playerName.isEmpty()) playerName = "Player1";
             }
         }
+
+        boolean isMultiplayer = multiplayerCheckbox.isSelected();
 
         int difficulty = 3; // Normal default
         for (Component comp : components) {
@@ -183,7 +194,7 @@ public class MenuPrincipal extends JPanel {
             }
         }
 
-        parent.startGame(playerName, difficulty, shipType);
+        parent.startGame(playerName, difficulty, shipType, isMultiplayer);
     }
 
     private void showHighscores() {
