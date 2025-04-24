@@ -8,6 +8,7 @@ public class FenetreJeu extends JFrame {
     private MenuPrincipal menuPanel;
     private Bouclejeu gamePanel;
     private HighscorePanel highscorePanel;
+    private MultiplayerPanel multiplayerPanel;
 
     public FenetreJeu() {
         setTitle("Space Defender");
@@ -33,8 +34,18 @@ public class FenetreJeu extends JFrame {
     }
 
     public void startGame(String playerName, int difficulty, int shipType, boolean isMultiplayer) {
+        startGame(playerName, difficulty, shipType, isMultiplayer, "localhost");
+    }
+
+    public void startGame(String playerName, int difficulty, int shipType, boolean isMultiplayer, String serverAddress) {
         cleanUpCurrentPanel();
         gamePanel = new Bouclejeu(this, playerName, difficulty, shipType, isMultiplayer);
+        if (isMultiplayer) {
+            // Définir l'adresse du serveur si c'est différent de localhost
+            if (!serverAddress.equals("localhost")) {
+                gamePanel.setServerAddress(serverAddress);
+            }
+        }
         switchToPanel(gamePanel);
     }
 
@@ -44,9 +55,39 @@ public class FenetreJeu extends JFrame {
         switchToPanel(highscorePanel);
     }
 
+    public void showMultiplayerMenu() {
+        cleanUpCurrentPanel();
+        multiplayerPanel = new MultiplayerPanel(this);
+        switchToPanel(multiplayerPanel);
+    }
+
+    public void startMultiplayerServer() {
+        // Option pour démarrer le serveur de jeu
+        try {
+            // Démarrer le serveur dans un thread séparé
+            new Thread(() -> {
+                try {
+                    Server.main(new String[]{});
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(this,
+                            "Erreur lors du démarrage du serveur: " + e.getMessage(),
+                            "Erreur serveur", JOptionPane.ERROR_MESSAGE);
+                }
+            }).start();
+
+            JOptionPane.showMessageDialog(this,
+                    "Serveur démarré avec succès sur le port 5555.\nLes autres joueurs peuvent se connecter à votre IP.",
+                    "Serveur démarré", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Impossible de démarrer le serveur: " + e.getMessage(),
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void cleanUpCurrentPanel() {
         if (gamePanel != null) {
-            gamePanel.cleanUp();
+            gamePanel.cleanupMultiplayer(); // Assurez-vous que cette méthode existe et nettoie correctement les ressources réseau
             remove(gamePanel);
             gamePanel = null;
         }
@@ -58,6 +99,10 @@ public class FenetreJeu extends JFrame {
             remove(highscorePanel);
             highscorePanel = null;
         }
+        if (multiplayerPanel != null) {
+            remove(multiplayerPanel);
+            multiplayerPanel = null;
+        }
     }
 
     private void switchToPanel(JPanel panel) {
@@ -65,6 +110,105 @@ public class FenetreJeu extends JFrame {
         revalidate();
         repaint();
         panel.requestFocusInWindow();
+    }
+
+    // Classe pour le menu multijoueur
+    private static class MultiplayerPanel extends JPanel {
+        private JTextField nameField;
+        private JTextField serverField;
+        private JComboBox<String> shipSelector;
+        private JComboBox<String> difficultySelector;
+
+        public MultiplayerPanel(FenetreJeu parent) {
+            setLayout(new BorderLayout());
+            setBackground(new Color(30, 30, 50));
+
+            JLabel title = new JLabel("MODE MULTIJOUEUR", SwingConstants.CENTER);
+            title.setFont(new Font("Arial", Font.BOLD, 36));
+            title.setForeground(new Color(255, 215, 0));
+            title.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+            add(title, BorderLayout.NORTH);
+
+            // Panel pour les options de jeu
+            JPanel formPanel = new JPanel();
+            formPanel.setLayout(new GridLayout(0, 2, 10, 10));
+            formPanel.setBackground(new Color(30, 30, 50));
+            formPanel.setBorder(BorderFactory.createEmptyBorder(10, 50, 10, 50));
+
+            // Champ nom du joueur
+            JLabel nameLabel = new JLabel("Nom du joueur:");
+            nameLabel.setForeground(Color.WHITE);
+            nameField = new JTextField("Joueur");
+
+            // Champ adresse du serveur
+            JLabel serverLabel = new JLabel("Adresse du serveur:");
+            serverLabel.setForeground(Color.WHITE);
+            serverField = new JTextField("localhost");
+
+            // Sélecteur de vaisseau
+            JLabel shipLabel = new JLabel("Vaisseau:");
+            shipLabel.setForeground(Color.WHITE);
+            shipSelector = new JComboBox<>(new String[]{"Vaisseau 1", "Vaisseau 2", "Vaisseau 3"});
+
+            // Sélecteur de difficulté
+            JLabel difficultyLabel = new JLabel("Difficulté:");
+            difficultyLabel.setForeground(Color.WHITE);
+            difficultySelector = new JComboBox<>(new String[]{"Facile", "Normal", "Difficile"});
+
+            // Ajouter les composants au formulaire
+            formPanel.add(nameLabel);
+            formPanel.add(nameField);
+            formPanel.add(serverLabel);
+            formPanel.add(serverField);
+            formPanel.add(shipLabel);
+            formPanel.add(shipSelector);
+            formPanel.add(difficultyLabel);
+            formPanel.add(difficultySelector);
+
+            add(formPanel, BorderLayout.CENTER);
+
+            // Panel pour les boutons
+            JPanel buttonPanel = new JPanel();
+            buttonPanel.setBackground(new Color(30, 30, 50));
+            buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 30, 0));
+
+            // Bouton pour rejoindre une partie
+            JButton joinButton = new JButton("REJOINDRE UNE PARTIE");
+            styleButton(joinButton, new Color(50, 205, 50));
+            joinButton.addActionListener(e -> {
+                String playerName = nameField.getText().trim();
+                String serverAddress = serverField.getText().trim();
+                int shipType = shipSelector.getSelectedIndex();
+                int difficulty = difficultySelector.getSelectedIndex() + 1;
+
+                if (playerName.isEmpty()) {
+                    JOptionPane.showMessageDialog(parent, "Veuillez entrer un nom de joueur", "Erreur", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                parent.startGame(playerName, difficulty, shipType, true, serverAddress);
+            });
+
+            // Bouton pour héberger une partie
+            JButton hostButton = new JButton("HÉBERGER UNE PARTIE");
+            styleButton(hostButton, new Color(70, 130, 180));
+            hostButton.addActionListener(e -> {
+                parent.startMultiplayerServer();
+                // On ne démarre pas le jeu tout de suite, le joueur devra cliquer sur "Rejoindre"
+                // avec "localhost" comme adresse de serveur
+            });
+
+            // Bouton pour revenir au menu principal
+            JButton backButton = new JButton("RETOUR");
+            styleButton(backButton, new Color(178, 34, 34));
+            backButton.addActionListener(e -> parent.showMenu());
+
+            buttonPanel.add(hostButton);
+            buttonPanel.add(joinButton);
+            buttonPanel.add(backButton);
+
+            add(buttonPanel, BorderLayout.SOUTH);
+        }
     }
 
     private static class HighscorePanel extends JPanel {
