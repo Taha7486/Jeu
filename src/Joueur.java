@@ -146,4 +146,6 @@ public class Joueur {
         return health;
     }
 
+    public int getX() {
+    return x;}
 }

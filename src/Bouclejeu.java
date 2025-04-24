@@ -3,7 +3,6 @@ import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -14,7 +13,7 @@ public class Bouclejeu extends JPanel {
     private final Random random = new Random();
     private int spawnTimer = 0;
 
-    private Joueur player; // Changé de final à non-final
+    private Joueur player;
     private final Image background;
     private int backgroundY = 0;
     private int scrollSpeed = 2;
@@ -25,19 +24,23 @@ public class Bouclejeu extends JPanel {
     private final Image playerLifeIcon;
     private final String playerName;
     private final int initialDifficulty;
+    private final int shipType;
     private final FenetreJeu parent;
     private ClientManager clientManager;
     private boolean isMultiplayer = false;
     private String serverAddress = "localhost";
     private Timer gameTimer;
     private final List<String> chatMessages = new ArrayList<>();
+    private boolean pvpMode = false;
 
     public Bouclejeu(FenetreJeu parent, String playerName, int difficulty, int shipType, boolean isMultiplayer) {
         this.parent = parent;
         this.playerName = playerName;
         this.initialDifficulty = difficulty;
+        this.shipType = shipType;
         this.isMultiplayer = isMultiplayer;
         this.pp = new Gestionniveux(difficulty);
+        this.pvpMode = isMultiplayer;
 
         // Initialisation des ressources qui ne dépendent pas de la connexion
         this.background = GestionRessources.getImage("/background.png");
@@ -45,7 +48,7 @@ public class Bouclejeu extends JPanel {
                 .getScaledInstance(30, 36, Image.SCALE_SMOOTH);
 
         if (isMultiplayer) {
-            clientManager = new ClientManager(playerName);
+            clientManager = new ClientManager(playerName, shipType);
             if (!clientManager.connectToServer(serverAddress)) {
                 JOptionPane.showMessageDialog(this, "Échec de connexion au serveur ou nom déjà pris", "Erreur", JOptionPane.ERROR_MESSAGE);
                 parent.showMenu();
@@ -65,7 +68,7 @@ public class Bouclejeu extends JPanel {
         String message = JOptionPane.showInputDialog(this, "Entrez votre message:");
         if (message != null && !message.trim().isEmpty()) {
             if (isMultiplayer) {
-                clientManager.sendMessage(message);
+                clientManager.sendChatMessage(message);
             } else {
                 addChatMessage("Vous: " + message);
             }
@@ -106,8 +109,14 @@ public class Bouclejeu extends JPanel {
         }
 
         if (e.getKeyCode() == KeyEvent.VK_SPACE && player.canShoot()) {
-            projectiles.add(new Projectile(player.getCenterX(), player.getY()));
+            Projectile projectile = new Projectile(player.getCenterX(), player.getY());
+            projectiles.add(projectile);
             player.shoot();
+
+            // En mode multijoueur, envoyer l'info du tir au serveur
+            if (isMultiplayer) {
+                clientManager.sendProjectile(player.getCenterX(), player.getY());
+            }
         } else if (isMovementKey(e.getKeyCode())) {
             player.handleKeyPress(e.getKeyCode());
         } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
@@ -141,9 +150,17 @@ public class Bouclejeu extends JPanel {
         }
 
         player.update();
+
+        // Envoyer position au serveur en mode multijoueur
+        if (isMultiplayer) {
+            clientManager.sendPosition(player.getX(), player.getY(), player.getHealth(), score);
+            clientManager.updateRemoteProjectiles();
+        }
+
         updateBackground();
 
-        if (++spawnTimer >= pp.getAdjustedSpawnInterval()) {
+        // Spawn d'ennemis uniquement en mode solo ou coopératif (pas en PvP)
+        if (!pvpMode && ++spawnTimer >= pp.getAdjustedSpawnInterval()) {
             spawnEnemy();
             spawnTimer = 0;
         }
@@ -156,7 +173,7 @@ public class Bouclejeu extends JPanel {
         enemies.removeIf(e -> !e.isAlive() || e.isOutOfScreen(getHeight()));
         projectiles.removeIf(p -> !p.isActive());
 
-        if (pp.isLevelCompleted()) {
+        if (!pvpMode && pp.isLevelCompleted()) {
             isLevelTransition = true;
             transitionStartTime = System.currentTimeMillis();
         }
@@ -178,8 +195,8 @@ public class Bouclejeu extends JPanel {
                 baseSpeed,
                 type));
     }
-
     private void handleCollisions() {
+        // Collisions entre projectiles locaux et ennemis
         new ArrayList<>(enemies).forEach(enemy -> {
             new ArrayList<>(projectiles).forEach(projectile -> {
                 if (projectile.isActive() && enemy.isAlive() &&
@@ -196,30 +213,220 @@ public class Bouclejeu extends JPanel {
             });
         });
 
+        // Collisions entre joueur local et ennemis
         new ArrayList<>(enemies).forEach(enemy -> {
             if (enemy.isAlive() && enemy.getHitbox().intersects(player.getHitbox())) {
                 enemy.takeDamage(enemy.getMaxHealth());
                 player.takeDamage();
-                if (player.getHealth() <= 0) {
-                    gameOver = true;
-                    GestionBaseDonnees.saveGameResult(
-                            playerName,
-                            score,
-                            pp.getCurrentLevel(),
-                            getDifficultyString(initialDifficulty)
-                    );
-                }
+                checkGameOver();
             }
         });
+
+        // En mode multijoueur, vérifier les collisions
+        if (isMultiplayer) {
+            // Collisions entre projectiles locaux et joueurs distants (PvP)
+            if (pvpMode) {
+                new ArrayList<>(projectiles).forEach(projectile -> {
+                    for (ClientManager.RemotePlayer remotePlayer : clientManager.getRemotePlayers()) {
+                        if (projectile.isActive() && projectile.getHitbox().intersects(remotePlayer.getHitbox())) {
+                            projectile.setActive(false);
+                            // Envoyer un message de collision au serveur (optionnel)
+                            // clientManager.sendHitMessage(remotePlayer.getName());
+                        }
+                    }
+                });
+            }
+
+            // Collisions entre projectiles distants et joueur local
+            new ArrayList<>(clientManager.getRemoteProjectiles()).forEach(projectile -> {
+                if (projectile.isActive() && projectile.getHitbox().intersects(player.getHitbox())) {
+                    projectile.setActive(false);
+                    player.takeDamage();
+                    checkGameOver();
+                }
+            });
+        }
+    }
+
+    private void checkGameOver() {
+        if (player.getHealth() <= 0) {
+            gameOver = true;
+        }
     }
 
     private void resetGame() {
+        player = new Joueur(380, 450, shipType);
+        enemies.clear();
+        projectiles.clear();
+        score = 0;
+        gameOver = false;
+        pp.reset();
+
+        if (isMultiplayer) {
+            // Réinitialiser les données multijoueur
+            clientManager.getRemoteProjectiles().clear();
+        }
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        // Dessiner l'arrière-plan
+        g.drawImage(background, 0, backgroundY - getHeight(), getWidth(), getHeight(), null);
+        g.drawImage(background, 0, backgroundY, getWidth(), getHeight(), null);
+
+        // Dessiner les ennemis
+        enemies.forEach(e -> e.draw(g));
+
+        // Dessiner les projectiles locaux
+        projectiles.forEach(p -> p.draw(g));
+
+        // En mode multijoueur, dessiner les joueurs distants et leurs projectiles
+        if (isMultiplayer) {
+            for (ClientManager.RemotePlayer remotePlayer : clientManager.getRemotePlayers()) {
+                remotePlayer.draw(g);
+            }
+
+            for (ClientManager.RemoteProjectile remoteProjectile : clientManager.getRemoteProjectiles()) {
+                remoteProjectile.draw(g);
+            }
+
+            // Dessiner les messages de chat
+            drawChatMessages(g);
+        }
+
+        // Dessiner le joueur local
+        player.draw(g);
+
+        // Afficher le score et le niveau
+        drawHUD(g);
+
+        // Afficher les transitions de niveau
+        if (isLevelTransition) {
+            drawLevelTransition(g);
+        }
+
+        // Afficher l'écran de fin de jeu
+        if (gameOver) {
+            drawGameOver(g);
+        }
+    }
+
+    private void drawChatMessages(Graphics g) {
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fillRect(10, 10, 300, 150);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        List<String> messages = isMultiplayer ? clientManager.getChatMessages() : chatMessages;
+        int y = 30;
+        for (String message : messages) {
+            g.drawString(message, 20, y);
+            y += 15;
+        }
+
+        g.setColor(Color.YELLOW);
+        g.drawString("Appuyez sur T pour discuter", 20, 160);
+    }
+
+    private void drawHUD(Graphics g) {
+        // Dessiner le score
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 20));
+        g.drawString("Score: " + score, 20, getHeight() - 50);
+
+        // Dessiner le niveau
+        g.setColor(Color.YELLOW);
+        g.drawString("Niveau: " + pp.getCurrentLevel(), 20, getHeight() - 20);
+
+        // Dessiner les vies restantes
+        for (int i = 0; i < player.getHealth(); i++) {
+            g.drawImage(playerLifeIcon, getWidth() - 40 - (i * 35), getHeight() - 40, null);
+        }
+
+        // En mode multijoueur, afficher les joueurs en ligne
+        if (isMultiplayer) {
+            g.setColor(Color.GREEN);
+            g.setFont(new Font("Arial", Font.BOLD, 14));
+            g.drawString("Joueurs en ligne: " + (clientManager.getOnlinePlayers().size() + 1),
+                    getWidth() - 200, 30);
+        }
+    }
+
+    private void drawLevelTransition(Graphics g) {
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        g.setColor(Color.YELLOW);
+        g.setFont(new Font("Arial", Font.BOLD, 40));
+        String message = "NIVEAU " + (pp.getCurrentLevel() + 1);
+        int stringWidth = g.getFontMetrics().stringWidth(message);
+        g.drawString(message, (getWidth() - stringWidth) / 2, getHeight() / 2);
+    }
+
+    private void drawGameOver(Graphics g) {
+        g.setColor(new Color(0, 0, 0, 200));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        g.setColor(Color.RED);
+        g.setFont(new Font("Arial", Font.BOLD, 40));
+        String message = "GAME OVER";
+        int stringWidth = g.getFontMetrics().stringWidth(message);
+        g.drawString(message, (getWidth() - stringWidth) / 2, getHeight() / 2 - 40);
+
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 20));
+        String scoreMsg = "Score final: " + score;
+        stringWidth = g.getFontMetrics().stringWidth(scoreMsg);
+        g.drawString(scoreMsg, (getWidth() - stringWidth) / 2, getHeight() / 2 + 10);
+
+        g.setColor(Color.YELLOW);
+        g.setFont(new Font("Arial", Font.PLAIN, 16));
+        String restartMsg = "Appuyez sur ESPACE pour recommencer";
+        stringWidth = g.getFontMetrics().stringWidth(restartMsg);
+        g.drawString(restartMsg, (getWidth() - stringWidth) / 2, getHeight() / 2 + 50);
+    }
+
+    public void cleanupMultiplayer() {
+        if (isMultiplayer && clientManager != null) {
+            clientManager.disconnect();
+        }
         if (gameTimer != null) {
             gameTimer.stop();
         }
-        parent.showMenu();
     }
 
+    // Méthode utilitaire pour déterminer si un point est dans la zone de jeu
+    private boolean isInBounds(int x, int y) {
+        return x >= 0 && x <= getWidth() && y >= 0 && y <= getHeight();
+    }
+
+    // Méthode pour régler le mode PvP
+    public void setPvpMode(boolean pvpMode) {
+        this.pvpMode = pvpMode;
+    }
+
+    // Méthode pour obtenir le score actuel
+    public int getScore() {
+        return score;
+    }
+
+    // Méthode pour obtenir le joueur
+    public Joueur getPlayer() {
+        return player;
+    }
+
+    // Méthode pour changer l'adresse du serveur (si besoin de se connecter à un autre serveur)
+    public void setServerAddress(String address) {
+        this.serverAddress = address;
+        if (isMultiplayer && clientManager != null) {
+            clientManager.disconnect();
+            clientManager = new ClientManager(playerName, shipType);
+            if (!clientManager.connectToServer(serverAddress)) {
+                JOptionPane.showMessageDialog(this, "Échec de connexion au serveur", "Erreur", JOptionPane.ERROR_MESSAGE);
+                parent.showMenu();
+            }
+        }
+    }
     public void cleanUp() {
         if (gameTimer != null) {
             gameTimer.stop();
@@ -228,178 +435,5 @@ public class Bouclejeu extends JPanel {
             clientManager.disconnect();
         }
     }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        // Scrolling background
-        g.drawImage(background, 0, backgroundY, getWidth(), getHeight(), null);
-        g.drawImage(background, 0, backgroundY - getHeight(), getWidth(), getHeight(), null);
-
-        // Entities
-        enemies.forEach(e -> e.draw(g));
-        projectiles.forEach(p -> p.draw(g));
-        player.draw(g);
-
-        drawLives(g);
-
-        // Level transition
-        if (isLevelTransition) {
-            g.setColor(new Color(0, 0, 0, 180));
-            g.fillRect(0, 0, getWidth(), getHeight());
-            g.setColor(Color.YELLOW);
-            g.setFont(new Font("Arial", Font.BOLD, 40));
-            String message = "LEVEL " + (pp.getCurrentLevel() + 1) + "!";
-            g.drawString(message,
-                    getWidth() / 2 - g.getFontMetrics().stringWidth(message) / 2,
-                    getHeight() / 2);
-        }
-
-        drawChatBox(g);
-
-        // Game Over
-        if (gameOver) {
-            drawGameOverScreen(g);
-        }
-    }
-
-    private void drawLives(Graphics g) {
-        int x = 20;
-        int y = 40;  // Moved from bottom to top
-
-        // Optional: Add a subtle background for better visibility
-        g.setColor(new Color(0, 0, 0, 150));
-        g.fillRoundRect(x - 5, y - 25,
-                player.getHealth() * 25 + 10,  // Dynamic width based on lives
-                50, 10, 10);
-
-        // Redraw the elements on top of the background
-        g.setColor(Color.WHITE);
-        g.setFont(new Font("Arial", Font.BOLD, 14));
-        g.drawString("Difficulty: " + getDifficultyString(initialDifficulty), x, y - 10);
-
-        for (int i = 0; i < player.getHealth(); i++) {
-            g.drawImage(playerLifeIcon, x + (i * 25), y + 5, 25, 30, null);
-        }
-    }
-
-    private String getDifficultyString(int difficulty) {
-        switch (difficulty) {
-            case 1: return "Easy";
-            case 3: return "Normal";
-            case 5: return "Hard";
-            default: return "Custom";
-        }
-    }
-
-    private void drawGameOverScreen(Graphics g) {
-        // Dark semi-transparent overlay
-        g.setColor(new Color(0, 0, 0, 180));
-        g.fillRect(0, 0, getWidth(), getHeight());
-
-        // Main game over panel
-        int panelWidth = 600;
-        int panelHeight = 400;
-        int panelX = (getWidth() - panelWidth) / 2;
-        int panelY = (getHeight() - panelHeight) / 2;
-
-        // Panel background with border
-        Graphics2D g2d = (Graphics2D) g;
-        g2d.setColor(new Color(40, 40, 60));
-        g2d.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 20, 20);
-        g2d.setColor(new Color(100, 100, 150));
-        g2d.setStroke(new BasicStroke(3));
-        g2d.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 20, 20);
-
-        // Title with gradient effect
-        GradientPaint gradient = new GradientPaint(
-                panelX, panelY, Color.RED,
-                panelX + panelWidth, panelY, Color.ORANGE
-        );
-        g2d.setPaint(gradient);
-        g2d.setFont(new Font("Arial", Font.BOLD, 48));
-        String title = "GAME OVER";
-        g2d.drawString(title,
-                panelX + (panelWidth - g2d.getFontMetrics().stringWidth(title)) / 2,
-                panelY + 60);
-
-        // Score display
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Arial", Font.BOLD, 28));
-        String scoreText = "YOUR SCORE: " + score;
-        g2d.drawString(scoreText,
-                panelX + (panelWidth - g2d.getFontMetrics().stringWidth(scoreText)) / 2,
-                panelY + 110);
-
-        // Player stats
-        g2d.setFont(new Font("Arial", Font.PLAIN, 20));
-        String levelText = "Level Reached: " + pp.getCurrentLevel();
-        String difficultyText = "Difficulty: " + getDifficultyString(initialDifficulty);
-
-        g2d.drawString(levelText, panelX + 50, panelY + 160);
-        g2d.drawString(difficultyText, panelX + panelWidth - 250, panelY + 160);
-
-        // High scores section
-        g2d.setColor(new Color(200, 200, 255));
-        g2d.setFont(new Font("Arial", Font.BOLD, 24));
-        g2d.drawString("TOP SCORES", panelX + 50, panelY + 200);
-
-        g2d.setColor(Color.WHITE);
-        g2d.setStroke(new BasicStroke(1));
-        g2d.drawLine(panelX + 50, panelY + 210, panelX + panelWidth - 50, panelY + 210);
-
-        List<String> highscores = GestionBaseDonnees.getHighScores(5);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 18));
-
-        for (int i = 0; i < highscores.size(); i++) {
-            String entry = String.format("%d. %s", i+1, highscores.get(i));
-            g2d.drawString(entry, panelX + 60, panelY + 240 + i * 30);
-        }
-
-        // Continue prompt
-        g2d.setColor(new Color(150, 255, 150));
-        g2d.setFont(new Font("Arial", Font.BOLD, 22));
-        String continueText = "Press Espace to return to menu";
-        g2d.drawString(continueText,
-                panelX + (panelWidth - g2d.getFontMetrics().stringWidth(continueText)) / 2,
-                panelY + panelHeight - 40);
-    }
-
-    private void drawChatBox(Graphics g) {
-        Graphics2D g2d = (Graphics2D) g;
-
-        // Fond semi-transparent
-        g2d.setColor(new Color(0, 0, 0, 150));
-        g2d.fillRoundRect(
-                getWidth() - 210,
-                getHeight() - 150,
-                200,
-                140,
-                15,
-                15
-        );
-
-        // Bordure
-        g2d.setColor(new Color(255, 255, 255, 100));
-        g2d.setStroke(new BasicStroke(2));
-        g2d.drawRoundRect(getWidth() - 210, getHeight() - 150, 200, 140, 15, 15);
-
-        // Texte du chat
-        g2d.setColor(Color.WHITE);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 12));
-
-        // Affichage des messages
-        int yPos = getHeight() - 130;
-        List<String> messages = isMultiplayer ?
-                clientManager.getChatMessages() : chatMessages;
-
-        for (String message : messages) {
-            g2d.drawString(message, getWidth() - 200, yPos);
-            yPos += 20;
-        }
-
-        // Indicateur de chat
-        g2d.drawString("Chat (T pour écrire)", getWidth() - 200, getHeight() - 30);
-    }
 }
+
