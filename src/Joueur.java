@@ -148,4 +148,7 @@ public class Joueur {
 
     public int getX() {
     return x;}
+
+    public void setVerticalBounds(int i, int i1) {
+    }
 }

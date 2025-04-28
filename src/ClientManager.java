@@ -21,6 +21,9 @@ public class ClientManager {
     private boolean connected = false;
     private Thread listenerThread;
 
+    public void sendHitMessage(String name) {
+    }
+
     // Représente un joueur distant
     public static class RemotePlayer {
         private String name;
@@ -76,6 +79,9 @@ public class ClientManager {
 
         public String getName() { return name; }
         public int getHealth() { return health; }
+
+        public void setVerticalBounds(int i, int i1) {
+        }
     }
 
     // Représente un projectile envoyé par un joueur distant
