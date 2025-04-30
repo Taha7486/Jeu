@@ -1,5 +1,4 @@
 import javax.imageio.ImageIO;
-import javax.sound.sampled.Clip;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -8,7 +7,6 @@ import java.io.File;
 
 public class GestionRessources {
     private static final Map<String, Image> images = new HashMap<>();
-    private static final Map<String, Clip> sounds = new HashMap<>();
 
     public static void preloadResources() {
         System.out.println("Préchargement des ressources...");
@@ -19,7 +17,10 @@ public class GestionRessources {
             loadImage("ship_" + i + ".png");
             loadImage("enemy_" + (i == 0 ? "basic" : i == 1 ? "fast" : "tank") + ".png");
         }
+<<<<<<< HEAD
         System.out.println("Préchargement terminé. Images chargées: " + images.size());
+=======
+>>>>>>> ce0b86bab71375ff8ae15ec4c34a3c16a883b4b1
     }
 
     public static Image getImage(String filename) {
@@ -31,6 +32,7 @@ public class GestionRessources {
 
     private static void loadImage(String filename) {
         try {
+<<<<<<< HEAD
             // Essayer de charger depuis le dossier resources
             String basePath = new File("").getAbsolutePath();
             File resourceFile = new File(basePath + "/src/resources/" + filename);
@@ -47,6 +49,9 @@ public class GestionRessources {
             }
             
             System.out.println("Image chargée avec succès: " + filename);
+=======
+            BufferedImage image = ImageIO.read(GestionRessources.class.getResourceAsStream(filename));
+>>>>>>> ce0b86bab71375ff8ae15ec4c34a3c16a883b4b1
             images.put(filename, image);
         } catch (Exception e) {
             System.err.println("Erreur de chargement de l'image: " + filename);

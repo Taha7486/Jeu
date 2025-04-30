@@ -272,11 +272,17 @@ public class FenetreJeu extends JFrame {
             setLayout(new BorderLayout());
             setBackground(new Color(30, 30, 50));
 
-            JLabel title = new JLabel("HIGH SCORES", SwingConstants.CENTER);
-            title.setFont(new Font("Arial", Font.BOLD, 36));
-            title.setForeground(new Color(255, 215, 0));
-            title.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
-            add(title, BorderLayout.NORTH);
+            JTabbedPane tabbedPane = new JTabbedPane();
+            tabbedPane.addTab("Single Player", createSinglePlayerScoresPanel());
+            tabbedPane.addTab("Two Players", createTwoPlayerResultsPanel());
+
+            add(tabbedPane, BorderLayout.CENTER);
+            add(createBackButtonPanel(parent), BorderLayout.SOUTH);
+        }
+
+        private JPanel createSinglePlayerScoresPanel() {
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.setBackground(new Color(30, 30, 50));
 
             JTextArea scoresArea = new JTextArea();
             scoresArea.setEditable(false);
@@ -284,14 +290,12 @@ public class FenetreJeu extends JFrame {
             scoresArea.setForeground(Color.WHITE);
             scoresArea.setFont(new Font("Arial", Font.PLAIN, 18));
 
-            // Utilisez DatabaseManager au lieu de HighscoreManager
-            List<String> highscores = GestionBaseDonnees.getHighScores(10); // 10 meilleurs scores
+            List<String> highscores = GestionBaseDonnees.getHighScores(10);
             if (highscores.isEmpty()) {
-                scoresArea.setText("No scores recorded yet");
+                scoresArea.setText("No single player scores recorded yet");
             } else {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < highscores.size(); i++) {
-                    // Formatage amélioré
                     sb.append(String.format("%2d. %s%n", i+1, highscores.get(i)));
                 }
                 scoresArea.setText(sb.toString());
@@ -299,16 +303,49 @@ public class FenetreJeu extends JFrame {
 
             JScrollPane scrollPane = new JScrollPane(scoresArea);
             scrollPane.setBorder(BorderFactory.createEmptyBorder());
-            add(scrollPane, BorderLayout.CENTER);
+            panel.add(scrollPane, BorderLayout.CENTER);
+
+            return panel;
+        }
+
+        private JPanel createTwoPlayerResultsPanel() {
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.setBackground(new Color(30, 30, 50));
+
+            JTextArea resultsArea = new JTextArea();
+            resultsArea.setEditable(false);
+            resultsArea.setBackground(new Color(30, 30, 50));
+            resultsArea.setForeground(Color.WHITE);
+            resultsArea.setFont(new Font("Arial", Font.PLAIN, 18));
+
+            List<String> results = GestionBaseDonnees.getTwoPlayerResults(10);
+            if (results.isEmpty()) {
+                resultsArea.setText("No two-player matches recorded yet");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < results.size(); i++) {
+                    sb.append(String.format("%2d. %s%n", i+1, results.get(i)));
+                }
+                resultsArea.setText(sb.toString());
+            }
+
+            JScrollPane scrollPane = new JScrollPane(resultsArea);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            panel.add(scrollPane, BorderLayout.CENTER);
+
+            return panel;
+        }
+
+        private JPanel createBackButtonPanel(FenetreJeu parent) {
+            JPanel buttonPanel = new JPanel();
+            buttonPanel.setBackground(new Color(30, 30, 50));
 
             JButton backButton = new JButton("BACK TO MENU");
             backButton.addActionListener(e -> parent.showMenu());
             styleButton(backButton, new Color(70, 130, 180));
 
-            JPanel buttonPanel = new JPanel();
-            buttonPanel.setBackground(new Color(30, 30, 50));
             buttonPanel.add(backButton);
-            add(buttonPanel, BorderLayout.SOUTH);
+            return buttonPanel;
         }
     }
 

@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,49 +16,62 @@ public class Joueur {
     private int health;
     private boolean invincible = false;
     private long invincibleEndTime = 0;
-    private int minY = 0;
-    private int maxY = Integer.MAX_VALUE;
 
-    public void setVerticalBounds(int minY, int maxY) {
-        this.minY = minY;
-        this.maxY = maxY;
-    }
-
-    public Joueur(int startX, int startY, int shipType) {
+    public Joueur(int startX, int startY, int shipType, boolean isPlayer1) {
         this.x = startX;
         this.y = startY;
         this.shipType = shipType;
         this.health = 3;
+        this.isPlayer1 = isPlayer1;
 
         switch(shipType) {
             case 0: // Standard
-                sprites[0] = GestionRessources.getImage("/ship_0.png");
-                sprites[1] = GestionRessources.getImage("/ship_0.png");
-                sprites[2] = GestionRessources.getImage("/ship_0.png");
+                sprites[0] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
+                sprites[1] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
+                sprites[2] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
                 speed = 5;
                 shotCooldown = 300;
                 break;
             case 1: // Fast
-                sprites[0] = GestionRessources.getImage("/ship_1.png");
-                sprites[1] = GestionRessources.getImage("/ship_1.png");
-                sprites[2] = GestionRessources.getImage("/ship_1.png");
+                sprites[0] = tintImage(GestionRessources.getImage("/ship_1.png"), isPlayer1);
+                sprites[1] = tintImage(GestionRessources.getImage("/ship_1.png"), isPlayer1);
+                sprites[2] = tintImage(GestionRessources.getImage("/ship_1.png"), isPlayer1);
                 speed = 7;
                 shotCooldown = 500;
                 break;
             case 2: // Heavy
-                sprites[0] = GestionRessources.getImage("/ship_2.png");
-                sprites[1] = GestionRessources.getImage("/ship_2.png");
-                sprites[2] = GestionRessources.getImage("/ship_2.png");
+                sprites[0] = tintImage(GestionRessources.getImage("/ship_2.png"), isPlayer1);
+                sprites[1] = tintImage(GestionRessources.getImage("/ship_2.png"), isPlayer1);
+                sprites[2] = tintImage(GestionRessources.getImage("/ship_2.png"), isPlayer1);
                 speed = 3;
                 shotCooldown = 150;
                 break;
             default:
-                sprites[0] = GestionRessources.getImage("/ship_0.png");
-                sprites[1] = GestionRessources.getImage("/ship_0.png");
-                sprites[2] = GestionRessources.getImage("/ship_0.png");
+                sprites[0] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
+                sprites[1] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
+                sprites[2] = tintImage(GestionRessources.getImage("/ship_0.png"), isPlayer1);
                 speed = 5;
                 shotCooldown = 300;
         }
+    }
+
+    private Image tintImage(Image image, boolean isPlayer1) {
+        BufferedImage buffered = new BufferedImage(
+                image.getWidth(null),
+                image.getHeight(null),
+                BufferedImage.TYPE_INT_ARGB);
+
+        Graphics2D g2d = buffered.createGraphics();
+        g2d.drawImage(image, 0, 0, null);
+
+        // Apply tint based on player
+        Color tint = isPlayer1 ? new Color(255, 255, 0, 50) : new Color(0, 255, 255, 50);
+        g2d.setColor(tint);
+        g2d.setComposite(AlphaComposite.SrcAtop);
+        g2d.fillRect(0, 0, buffered.getWidth(), buffered.getHeight());
+
+        g2d.dispose();
+        return buffered;
     }
 
     public void handleKeyPress(int keyCode) {
@@ -133,7 +147,7 @@ public class Joueur {
     private void drawHealthBar(Graphics g) {
         g.setColor(Color.RED);
         g.fillRect(x, y - 15, 50, 5);
-        g.setColor(Color.GREEN);
+        g.setColor(isPlayer1 ? Color.YELLOW : Color.CYAN);
         g.fillRect(x, y - 15, (int)(50 * ((double)health / 3)), 5);
     }
 
@@ -153,6 +167,4 @@ public class Joueur {
         return health;
     }
 
-    public int getX() {
-    return x;}
 }
