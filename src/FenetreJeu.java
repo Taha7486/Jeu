@@ -39,14 +39,48 @@ public class FenetreJeu extends JFrame {
 
     public void startGame(String playerName, int difficulty, int shipType, boolean isMultiplayer, String serverAddress) {
         cleanUpCurrentPanel();
-        gamePanel = new Bouclejeu(this, playerName, difficulty, shipType, isMultiplayer);
-        if (isMultiplayer) {
-            // Définir l'adresse du serveur si c'est différent de localhost
-            if (!serverAddress.equals("localhost")) {
-                gamePanel.setServerAddress(serverAddress);
+        try {
+            if (isMultiplayer) {
+                try {
+                    java.net.Socket testSocket = new java.net.Socket();
+                    testSocket.connect(new java.net.InetSocketAddress(serverAddress, 5555), 3000);
+                    testSocket.close();
+                } catch (Exception e) {
+                    GestionSon.playSound("gameover.wav");
+                    JOptionPane.showMessageDialog(this,
+                        "Impossible de se connecter au serveur " + serverAddress + ":" + 5555 + "\n" +
+                        "Erreur: " + e.getMessage(),
+                        "Erreur de connexion", JOptionPane.ERROR_MESSAGE);
+                    showMenu();
+                    return;
+                }
             }
+
+            gamePanel = new Bouclejeu(this, playerName, difficulty, shipType, isMultiplayer);
+            if (isMultiplayer) {
+                gamePanel.setServerAddress(serverAddress);
+
+                if (!gamePanel.getClientManager().isConnected()) {
+                    GestionSon.playSound("gameover.wav");
+                    JOptionPane.showMessageDialog(this,
+                        "Échec de connexion au serveur",
+                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                    showMenu();
+                    return;
+                }
+            }
+
+            // Jouer un son de démarrage
+            GestionSon.playSound("powerup.wav");
+            
+            switchToPanel(gamePanel);
+        } catch (Exception e) {
+            GestionSon.playSound("gameover.wav");
+            JOptionPane.showMessageDialog(this,
+                "Erreur lors du démarrage du jeu: " + e.getMessage(),
+                "Erreur", JOptionPane.ERROR_MESSAGE);
+            showMenu();
         }
-        switchToPanel(gamePanel);
     }
 
     public void showHighscores() {
@@ -62,32 +96,54 @@ public class FenetreJeu extends JFrame {
     }
 
     public void startMultiplayerServer() {
-        // Option pour démarrer le serveur de jeu
         try {
+            // Vérifier si le port est déjà utilisé
+            try {
+                java.net.ServerSocket testSocket = new java.net.ServerSocket(5555);
+                testSocket.close();
+            } catch (java.io.IOException e) {
+                JOptionPane.showMessageDialog(this,
+                    "Le port 5555 est déjà utilisé. Le serveur est peut-être déjà en cours d'exécution.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             // Démarrer le serveur dans un thread séparé
-            new Thread(() -> {
+            Thread serverThread = new Thread(() -> {
                 try {
                     Server.main(new String[]{});
                 } catch (Exception e) {
-                    JOptionPane.showMessageDialog(this,
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this,
                             "Erreur lors du démarrage du serveur: " + e.getMessage(),
                             "Erreur serveur", JOptionPane.ERROR_MESSAGE);
+                    });
                 }
-            }).start();
+            });
+            serverThread.setDaemon(true);
+            serverThread.start();
+
+            // Attendre un peu pour s'assurer que le serveur démarre
+            Thread.sleep(1000);
+
+            // Jouer un son de confirmation
+            GestionSon.playSound("powerup.wav");
 
             JOptionPane.showMessageDialog(this,
-                    "Serveur démarré avec succès sur le port 5555.\nLes autres joueurs peuvent se connecter à votre IP.",
-                    "Serveur démarré", JOptionPane.INFORMATION_MESSAGE);
+                "Serveur démarré avec succès sur le port 5555.\n" +
+                "Les autres joueurs peuvent se connecter à votre IP.\n" +
+                "Votre IP locale est: " + java.net.InetAddress.getLocalHost().getHostAddress(),
+                "Serveur démarré", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
-                    "Impossible de démarrer le serveur: " + e.getMessage(),
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                "Impossible de démarrer le serveur: " + e.getMessage(),
+                "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void cleanUpCurrentPanel() {
         if (gamePanel != null) {
-            gamePanel.cleanupMultiplayer(); // Assurez-vous que cette méthode existe et nettoie correctement les ressources réseau
+            gamePanel.cleanupMultiplayer();
             remove(gamePanel);
             gamePanel = null;
         }

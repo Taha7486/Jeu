@@ -15,6 +15,13 @@ public class Joueur {
     private int health;
     private boolean invincible = false;
     private long invincibleEndTime = 0;
+    private int minY = 0;
+    private int maxY = Integer.MAX_VALUE;
+
+    public void setVerticalBounds(int minY, int maxY) {
+        this.minY = minY;
+        this.maxY = maxY;
+    }
 
     public Joueur(int startX, int startY, int shipType) {
         this.x = startX;

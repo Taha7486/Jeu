@@ -82,7 +82,9 @@
         public int getProjectileY() { return projectileY; }
         public int getHealth() { return health; }
         public int getScore() { return score; }
-        public String getChatContent() { return chatContent; }
+        public String getChatContent() {
+            return chatContent != null ? chatContent : "";
+        }
         public int getShipType() { return shipType; }
     }
 

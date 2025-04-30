@@ -65,21 +65,52 @@ public class Server {
 
     public static synchronized void removeClient(ClientHandler client, String name) {
         clients.remove(client);
-        playerNames.remove(name);
-        players.remove(name);
-        System.out.println("Player " + name + " disconnected");
-        GameMessage leaveMsg = GameMessage.createChatMessage("SYSTEM", name + " a quitté le jeu");
-        broadcast(leaveMsg, null);
-        updatePlayerList();
+        if (name != null) {
+            playerNames.remove(name);
+            players.remove(name);
+            
+            // Envoyer une notification à tous les clients
+            GameMessage leaveMsg = GameMessage.createChatMessage("SYSTEM",
+                    name + " a quitté la partie");
+            broadcast(leaveMsg, null);
+            
+            // Mettre à jour la liste des joueurs
+            updatePlayerList();
+        }
     }
 
     public static synchronized void updatePlayerPosition(String name, int x, int y, int health, int score) {
         PlayerInfo player = players.get(name);
         if (player != null) {
-            player.x = x;
-            player.y = y;
-            player.health = health;
+            // Limiter la position X entre 0 et 750 (pour un écran de 800 de large)
+            player.x = Math.max(0, Math.min(750, x));
+            
+            // Définir des zones de jeu distinctes pour chaque joueur
+            if (players.size() <= 1) {
+                // Si un seul joueur, zone centrale
+                player.y = Math.max(200, Math.min(400, y));
+            } else {
+                // Sinon, diviser l'écran en zones
+                boolean isFirstPlayer = players.keySet().iterator().next().equals(name);
+                if (isFirstPlayer) {
+                    player.y = Math.max(350, Math.min(500, y)); // Zone basse
+                } else {
+                    player.y = Math.max(100, Math.min(250, y));  // Zone haute
+                }
+            }
+            
+            player.health = Math.max(0, Math.min(3, health));
             player.score = score;
+
+            // Envoyer la mise à jour de position à tous les clients
+            GameMessage posMsg = GameMessage.createPositionMessage(name, player.x, player.y, player.health, player.score);
+            broadcast(posMsg, null);
+
+            if (health <= 0) {
+                GameMessage deathMsg = GameMessage.createChatMessage("SYSTEM",
+                        name + " a été éliminé !");
+                broadcast(deathMsg, null);
+            }
         }
     }
 
@@ -149,8 +180,14 @@ class ClientHandler extends Thread {
                 GameMessage newPlayerMsg = GameMessage.createJoinMessage(playerName, shipType);
                 Server.broadcast(newPlayerMsg, this);
 
-                GameMessage chatMsg = GameMessage.createChatMessage("SYSTEM", playerName + " a rejoint le jeu");
+                GameMessage chatMsg = GameMessage.createChatMessage("SYSTEM",
+                        playerName + " a rejoint la partie");
                 Server.broadcast(chatMsg, null);
+
+// Et pour les déconnexions:
+                GameMessage leaveMsg = GameMessage.createChatMessage("SYSTEM",
+                        playerName + " a quitté la partie");
+                Server.broadcast(leaveMsg, null);
             }
 
             // Boucle principale de traitement des messages
@@ -170,11 +207,51 @@ class ClientHandler extends Thread {
                         break;
 
                     case PLAYER_SHOOT:
-                        Server.broadcast(clientMessage, null);
+                        // Vérifier que le joueur est vivant avant de permettre le tir
+                        Server.PlayerInfo shooter = Server.getPlayers().get(playerName);
+                        if (shooter != null && shooter.health > 0) {
+                            Server.broadcast(clientMessage, null);
+                        }
                         break;
 
                     case PLAYER_HIT:
-                        Server.broadcast(clientMessage, null);
+                        String hitPlayerName = clientMessage.getPlayerName();
+                        Server.PlayerInfo hitPlayer = Server.getPlayers().get(hitPlayerName);
+                        if (hitPlayer != null && hitPlayer.health > 0) {
+                            hitPlayer.health--;
+                            
+                            // Augmenter le score du tireur
+                            Server.PlayerInfo attackingPlayer = Server.getPlayers().get(playerName);
+                            if (attackingPlayer != null) {
+                                attackingPlayer.score += 10;
+                                
+                                // Envoyer les mises à jour des deux joueurs
+                                GameMessage attackerUpdate = GameMessage.createPositionMessage(
+                                    playerName,
+                                    attackingPlayer.x,
+                                    attackingPlayer.y,
+                                    attackingPlayer.health,
+                                    attackingPlayer.score
+                                );
+                                Server.broadcast(attackerUpdate, null);
+                            }
+
+                            // Envoyer les mises à jour de la cible
+                            GameMessage targetUpdate = GameMessage.createPositionMessage(
+                                hitPlayerName,
+                                hitPlayer.x,
+                                hitPlayer.y,
+                                hitPlayer.health,
+                                hitPlayer.score
+                            );
+                            Server.broadcast(targetUpdate, null);
+
+                            if (hitPlayer.health <= 0) {
+                                GameMessage deathMsg = GameMessage.createChatMessage("SYSTEM",
+                                    hitPlayerName + " a été éliminé par " + playerName + " !");
+                                Server.broadcast(deathMsg, null);
+                            }
+                        }
                         break;
 
                     case CHAT_MESSAGE:
