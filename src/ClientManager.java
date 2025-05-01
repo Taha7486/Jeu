@@ -21,9 +21,18 @@ public class ClientManager {
     private boolean connected = false;
     private Thread listenerThread;
 
-    public void sendHitMessage(String name) {
+    public void sendHitMessage(String targetPlayerName) {
+        if (connected && out != null) {
+            try {
+                GameMessage hitMsg = GameMessage.createHitMessage(targetPlayerName);
+                out.writeObject(hitMsg);
+                out.flush();
+            } catch (IOException e) {
+                System.err.println("Error sending hit message: " + e.getMessage());
+                closeConnection();
+            }
+        }
     }
-
     // Représente un joueur distant
     public static class RemotePlayer {
         private String name;
@@ -320,6 +329,7 @@ public class ClientManager {
             proj.update();
         }
     }
+
 
     public boolean isConnected() {
         return connected;

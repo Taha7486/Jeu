@@ -11,20 +11,20 @@ public class Server {
     private static final Set<String> playerNames = new HashSet<>();
 
     // Stocke les informations des joueurs
-    static class PlayerInfo {
-        int x, y;
-        int health;
-        int score;
-        int shipType;
+        static class PlayerInfo {
+            int x, y;
+            int health; // Ajoutez ce champ si il n'existe pas
+            int score;
+            int shipType;
 
-        public PlayerInfo(int shipType) {
-            this.x = 380;
-            this.y = 450;
-            this.health = 3;
-            this.score = 0;
-            this.shipType = shipType;
+            public PlayerInfo(int shipType) {
+                this.x = 380;
+                this.y = 450;
+                this.health = 3; // Initialisation de health
+                this.score = 0;
+                this.shipType = shipType;
+            }
         }
-    }
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -174,13 +174,24 @@ class ClientHandler extends Thread {
                         break;
 
                     case PLAYER_HIT:
+                        Server.PlayerInfo hitPlayer = Server.getPlayers().get(clientMessage.getPlayerName());
+                        if (hitPlayer != null) {
+                            hitPlayer.health--;
+                            if (hitPlayer.health <= 0) {
+                                // Envoyer un message de fin de partie à tous les joueurs
+                                GameMessage gameOverMsg = GameMessage.createChatMessage("SYSTEM", clientMessage.getPlayerName() + " a été éliminé !");
+                                Server.broadcast(gameOverMsg, null);
+                                // Envoyer un message de fin de partie pour tous les joueurs
+                                GameMessage gameoverForAll = GameMessage.createChatMessage("SYSTEM", "La partie est terminée !");
+                                Server.broadcast(gameoverForAll, null);
+                            }
+                        }
                         Server.broadcast(clientMessage, null);
                         break;
 
                     case CHAT_MESSAGE:
                         GameMessage formattedMsg = GameMessage.createChatMessage(
-                                playerName, clientMessage.getChatContent()
-                        );
+                                playerName, clientMessage.getChatContent());
                         Server.broadcast(formattedMsg, null);
                         break;
 

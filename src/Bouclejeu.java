@@ -156,7 +156,6 @@ public class Bouclejeu extends JPanel {
     }
 
     private void updateGame() {
-
         if (player == null || gameOver) {
             return;
         }
@@ -250,7 +249,6 @@ public class Bouclejeu extends JPanel {
             }
         });
 
-        // En mode multijoueur, vérifier les collisions
         if (isMultiplayer) {
             // Collisions entre projectiles distants et joueur local
             new ArrayList<>(clientManager.getRemoteProjectiles()).forEach(projectile -> {
@@ -258,10 +256,14 @@ public class Bouclejeu extends JPanel {
                     projectile.setActive(false);
                     player.takeDamage();
                     checkGameOver();
+
+                    // Envoyer l'info de dégât au serveur
+                    if (pvpMode) {
+                        clientManager.sendPosition(player.getX(), player.getY(), player.getHealth(), score);
+                    }
                 }
             });
 
-            // AJOUTEZ VOTRE CODE ICI - Début du nouveau bloc
             if (pvpMode) {
                 // Vérifier les collisions entre projectiles locaux et joueurs distants
                 for (Projectile projectile : new ArrayList<>(projectiles)) {
@@ -280,16 +282,45 @@ public class Bouclejeu extends JPanel {
                         gameOver = true;
                         // Envoyer un message de victoire au serveur
                         clientManager.sendChatMessage("J'ai gagné !");
+                        // Sauvegarder le score si nécessaire
+                        if (!pvpMode) {
+                            String difficulty = switch(initialDifficulty) {
+                                case 1 -> "Facile";
+                                case 2 -> "Normal";
+                                case 3 -> "Difficile";
+                                default -> "Normal";
+                            };
+                            GestionBaseDonnees.saveGameResult(playerName, score, levelManager.getCurrentLevel(), difficulty);
+                        }
+                    }
+                }
+
+                // Vérifier si le joueur local est mort
+                if (player.getHealth() <= 0 && !gameOver) {
+                    gameOver = true;
+                    // Envoyer un message de défaite au serveur
+                    clientManager.sendChatMessage("J'ai perdu !");
+                    // Sauvegarder le score si nécessaire
+                    if (!pvpMode) {
+                        String difficulty = switch(initialDifficulty) {
+                            case 1 -> "Facile";
+                            case 2 -> "Normal";
+                            case 3 -> "Difficile";
+                            default -> "Normal";
+                        };
+                        GestionBaseDonnees.saveGameResult(playerName, score, levelManager.getCurrentLevel(), difficulty);
                     }
                 }
             }
-            // FIN du nouveau bloc
         }
     }
 
     private void checkGameOver() {
         if (player.getHealth() <= 0) {
             gameOver = true;
+            if (isMultiplayer && pvpMode) {
+                clientManager.sendChatMessage("J'ai perdu !");
+            }
         }
     }
 
