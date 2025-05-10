@@ -7,7 +7,7 @@ import java.util.List;
 public class FenetreJeu extends JFrame {
     private MenuPrincipal menuPanel;
     private Bouclejeu gamePanel;
-    private HighscorePanel highscorePanel;
+    private HighScorePanel highScorePanel;
     private MultiplayerPanel multiplayerPanel;
 
     public FenetreJeu() {
@@ -41,7 +41,6 @@ public class FenetreJeu extends JFrame {
         cleanUpCurrentPanel();
         gamePanel = new Bouclejeu(this, playerName, difficulty, shipType, isMultiplayer);
         if (isMultiplayer) {
-            // Définir l'adresse du serveur si c'est différent de localhost
             if (!serverAddress.equals("localhost")) {
                 gamePanel.setServerAddress(serverAddress);
             }
@@ -51,8 +50,8 @@ public class FenetreJeu extends JFrame {
 
     public void showHighscores() {
         cleanUpCurrentPanel();
-        highscorePanel = new HighscorePanel(this);
-        switchToPanel(highscorePanel);
+        highScorePanel = new HighScorePanel();
+        switchToPanel(highScorePanel);
     }
 
     public void showMultiplayerMenu() {
@@ -62,9 +61,7 @@ public class FenetreJeu extends JFrame {
     }
 
     public void startMultiplayerServer() {
-        // Option pour démarrer le serveur de jeu
         try {
-            // Démarrer le serveur dans un thread séparé
             new Thread(() -> {
                 try {
                     Server.main(new String[]{});
@@ -87,7 +84,7 @@ public class FenetreJeu extends JFrame {
 
     private void cleanUpCurrentPanel() {
         if (gamePanel != null) {
-            gamePanel.cleanupMultiplayer(); // Assurez-vous que cette méthode existe et nettoie correctement les ressources réseau
+            gamePanel.cleanupMultiplayer();
             remove(gamePanel);
             gamePanel = null;
         }
@@ -95,9 +92,9 @@ public class FenetreJeu extends JFrame {
             remove(menuPanel);
             menuPanel = null;
         }
-        if (highscorePanel != null) {
-            remove(highscorePanel);
-            highscorePanel = null;
+        if (highScorePanel != null) {
+            remove(highScorePanel);
+            highScorePanel = null;
         }
         if (multiplayerPanel != null) {
             remove(multiplayerPanel);
@@ -106,32 +103,34 @@ public class FenetreJeu extends JFrame {
     }
 
     private void switchToPanel(JPanel panel) {
-        add(panel);
+        getContentPane().removeAll();
+        getContentPane().add(panel);
         revalidate();
         repaint();
         panel.requestFocusInWindow();
     }
 
-    // Classe pour le menu multijoueur
     private static class MultiplayerPanel extends JPanel {
         private JTextField nameField;
         private JTextField serverField;
         private JComboBox<String> shipSelector;
         private JComboBox<String> difficultySelector;
+        private FenetreJeu parent;
 
         public MultiplayerPanel(FenetreJeu parent) {
+            this.parent = parent;
             setLayout(new BorderLayout());
             setBackground(new Color(30, 30, 50));
 
+            // Titre
             JLabel title = new JLabel("MODE MULTIJOUEUR", SwingConstants.CENTER);
             title.setFont(new Font("Arial", Font.BOLD, 36));
             title.setForeground(new Color(255, 215, 0));
             title.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
             add(title, BorderLayout.NORTH);
 
-            // Panel pour les options de jeu
-            JPanel formPanel = new JPanel();
-            formPanel.setLayout(new GridLayout(0, 2, 10, 10));
+            // Panel formulaire
+            JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
             formPanel.setBackground(new Color(30, 30, 50));
             formPanel.setBorder(BorderFactory.createEmptyBorder(10, 50, 10, 50));
 
@@ -155,7 +154,7 @@ public class FenetreJeu extends JFrame {
             difficultyLabel.setForeground(Color.WHITE);
             difficultySelector = new JComboBox<>(new String[]{"Facile", "Normal", "Difficile"});
 
-            // Ajouter les composants au formulaire
+            // Ajout des composants
             formPanel.add(nameLabel);
             formPanel.add(nameField);
             formPanel.add(serverLabel);
@@ -167,38 +166,36 @@ public class FenetreJeu extends JFrame {
 
             add(formPanel, BorderLayout.CENTER);
 
-            // Panel pour les boutons
+            // Panel boutons
             JPanel buttonPanel = new JPanel();
             buttonPanel.setBackground(new Color(30, 30, 50));
             buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 30, 0));
 
-            // Bouton pour rejoindre une partie
+            // Bouton Héberger
+            JButton hostButton = new JButton("HÉBERGER UNE PARTIE");
+            styleButton(hostButton, new Color(70, 130, 180));
+            hostButton.addActionListener(e -> parent.startMultiplayerServer());
+
+            // Bouton Rejoindre
             JButton joinButton = new JButton("REJOINDRE UNE PARTIE");
             styleButton(joinButton, new Color(50, 205, 50));
             joinButton.addActionListener(e -> {
                 String playerName = nameField.getText().trim();
-                String serverAddress = serverField.getText().trim();
-                int shipType = shipSelector.getSelectedIndex();
-                int difficulty = difficultySelector.getSelectedIndex() + 1;
-
                 if (playerName.isEmpty()) {
-                    JOptionPane.showMessageDialog(parent, "Veuillez entrer un nom de joueur", "Erreur", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(parent,
+                            "Veuillez entrer un nom de joueur",
+                            "Erreur",
+                            JOptionPane.ERROR_MESSAGE);
                     return;
                 }
-
-                parent.startGame(playerName, difficulty, shipType, true, serverAddress);
+                parent.startGame(playerName,
+                        difficultySelector.getSelectedIndex() + 1,
+                        shipSelector.getSelectedIndex(),
+                        true,
+                        serverField.getText());
             });
 
-            // Bouton pour héberger une partie
-            JButton hostButton = new JButton("HÉBERGER UNE PARTIE");
-            styleButton(hostButton, new Color(70, 130, 180));
-            hostButton.addActionListener(e -> {
-                parent.startMultiplayerServer();
-                // On ne démarre pas le jeu tout de suite, le joueur devra cliquer sur "Rejoindre"
-                // avec "localhost" comme adresse de serveur
-            });
-
-            // Bouton pour revenir au menu principal
+            // Bouton Retour
             JButton backButton = new JButton("RETOUR");
             styleButton(backButton, new Color(178, 34, 34));
             backButton.addActionListener(e -> parent.showMenu());
@@ -209,50 +206,28 @@ public class FenetreJeu extends JFrame {
 
             add(buttonPanel, BorderLayout.SOUTH);
         }
-    }
 
-    private static class HighscorePanel extends JPanel {
-        public HighscorePanel(FenetreJeu parent) {
-            setLayout(new BorderLayout());
-            setBackground(new Color(30, 30, 50));
+        private void styleButton(JButton button, Color color) {
+            button.setFont(new Font("Arial", Font.BOLD, 16));
+            button.setBackground(color);
+            button.setForeground(Color.BLACK);
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createEmptyBorder(10, 25, 10, 25));
+            button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-            JLabel title = new JLabel("HIGH SCORES", SwingConstants.CENTER);
-            title.setFont(new Font("Arial", Font.BOLD, 36));
-            title.setForeground(new Color(255, 215, 0));
-            title.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
-            add(title, BorderLayout.NORTH);
-
-            JTextArea scoresArea = new JTextArea();
-            scoresArea.setEditable(false);
-            scoresArea.setBackground(new Color(30, 30, 50));
-            scoresArea.setForeground(Color.WHITE);
-            scoresArea.setFont(new Font("Arial", Font.PLAIN, 18));
-
-            // Utilisez DatabaseManager au lieu de HighscoreManager
-            List<String> highscores = GestionBaseDonnees.getHighScores(10); // 10 meilleurs scores
-            if (highscores.isEmpty()) {
-                scoresArea.setText("No scores recorded yet");
-            } else {
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < highscores.size(); i++) {
-                    // Formatage amélioré
-                    sb.append(String.format("%2d. %s%n", i+1, highscores.get(i)));
+            button.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    button.setBackground(color.brighter());
+                    button.setForeground(Color.WHITE);
                 }
-                scoresArea.setText(sb.toString());
-            }
 
-            JScrollPane scrollPane = new JScrollPane(scoresArea);
-            scrollPane.setBorder(BorderFactory.createEmptyBorder());
-            add(scrollPane, BorderLayout.CENTER);
-
-            JButton backButton = new JButton("BACK TO MENU");
-            backButton.addActionListener(e -> parent.showMenu());
-            styleButton(backButton, new Color(70, 130, 180));
-
-            JPanel buttonPanel = new JPanel();
-            buttonPanel.setBackground(new Color(30, 30, 50));
-            buttonPanel.add(backButton);
-            add(buttonPanel, BorderLayout.SOUTH);
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    button.setBackground(color);
+                    button.setForeground(Color.BLACK);
+                }
+            });
         }
     }
 
@@ -277,5 +252,89 @@ public class FenetreJeu extends JFrame {
                 button.setForeground(Color.BLACK);
             }
         });
+    }
+}
+
+class HighScorePanel extends JPanel {
+    private JTabbedPane tabbedPane;
+
+    public HighScorePanel() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("MEILLEURS SCORES", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(Color.YELLOW);
+        add(titleLabel, BorderLayout.NORTH);
+
+        tabbedPane = new JTabbedPane();
+
+        JPanel soloPanel = createScorePanel(false);
+        tabbedPane.addTab("Mode Solo", soloPanel);
+
+        JPanel multiPanel = createScorePanel(true);
+        tabbedPane.addTab("Mode Multijoueur", multiPanel);
+
+        JPanel sessionsPanel = createSessionsPanel();
+        tabbedPane.addTab("Sessions Multijoueur", sessionsPanel);
+
+        add(tabbedPane, BorderLayout.CENTER);
+
+        JButton backButton = new JButton("Retour au menu");
+        backButton.addActionListener(e -> {
+            Container parent = getParent();
+            if (parent != null) {
+                CardLayout cl = (CardLayout) parent.getLayout();
+                cl.show(parent, "menu");
+            }
+        });
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(backButton);
+        add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    private JPanel createScorePanel(boolean multiplayer) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        List<String> scores = multiplayer ?
+                GestionBaseDonnees.getHighScores(10, String.valueOf(true)) :
+                GestionBaseDonnees.getHighScores(10, String.valueOf(false));
+
+        JList<String> scoreList = new JList<>(scores.toArray(new String[0]));
+        scoreList.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        scoreList.setBackground(new Color(20, 20, 50));
+        scoreList.setForeground(Color.WHITE);
+
+        JScrollPane scrollPane = new JScrollPane(scoreList);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createSessionsPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        List<String> sessions = GestionBaseDonnees.getTopMultiplayerSessions(10);
+        JList<String> sessionList = new JList<>(sessions.toArray(new String[0]));
+        sessionList.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        sessionList.setBackground(new Color(20, 20, 50));
+        sessionList.setForeground(Color.WHITE);
+
+        JScrollPane scrollPane = new JScrollPane(sessionList);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    public void refreshScores() {
+        tabbedPane.removeAll();
+        tabbedPane.addTab("Mode Solo", createScorePanel(false));
+        tabbedPane.addTab("Mode Multijoueur", createScorePanel(true));
+        tabbedPane.addTab("Sessions Multijoueur", createSessionsPanel());
+        revalidate();
+        repaint();
     }
 }

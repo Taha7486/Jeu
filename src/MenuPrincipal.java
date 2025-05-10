@@ -8,6 +8,9 @@ public class MenuPrincipal extends JPanel {
     private JTextField nameField;
     private JComboBox<String> difficultySelector;
     private JComboBox<String> shipSelector;
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    private HighScorePanel highScorePanel;
 
     public MenuPrincipal(FenetreJeu parent) {
         this.parent = parent;
@@ -20,6 +23,20 @@ public class MenuPrincipal extends JPanel {
         titleLabel.setForeground(new Color(255, 215, 0));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(40, 0, 40, 0));
         add(titleLabel, BorderLayout.NORTH);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+        JPanel menuPanel = createMenuPanel();
+        mainPanel.add(menuPanel, "menu");
+
+        // Création du panneau de scores
+        highScorePanel = new HighScorePanel();
+        mainPanel.add(highScorePanel, "scores");
+
+        add(mainPanel, BorderLayout.CENTER);
+
+        // Afficher le menu par défaut
+        cardLayout.show(mainPanel, "menu");
 
         // Panneau central avec options de jeu
         JPanel centerPanel = new JPanel();
@@ -95,6 +112,64 @@ public class MenuPrincipal extends JPanel {
         buttonPanel.add(quitButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    private JPanel createMenuPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(new Color(20, 20, 50));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(10, 50, 10, 50);
+
+        // Bouton Mode Solo
+        JButton soloButton = createButton("Mode Solo");
+        soloButton.addActionListener(e -> showDifficultySelection(false));
+        panel.add(soloButton, gbc);
+
+        // Bouton Mode Multijoueur
+        JButton multiButton = createButton("Mode Multijoueur");
+        multiButton.addActionListener(e -> showMultiplayerOptions());
+        panel.add(multiButton, gbc);
+
+        // Bouton Meilleurs Scores
+        JButton scoresButton = createButton("Meilleurs Scores");
+        scoresButton.addActionListener(e -> showHighScores());
+        panel.add(scoresButton, gbc);
+
+        // Bouton Quitter
+        JButton quitButton = createButton("Quitter");
+        quitButton.addActionListener(e -> System.exit(0));
+        panel.add(quitButton, gbc);
+
+        return panel;
+    }
+
+    private JButton createButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Arial", Font.BOLD, 18));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(50, 50, 150));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setPreferredSize(new Dimension(300, 60));
+        return button;
+    }
+
+    private void showDifficultySelection(boolean isMultiplayer) {
+        // Implémentation de la méthode
+    }
+
+    private void showMultiplayerOptions() {
+        // Implémentation de la méthode
+    }
+
+    private void showHighScores() {
+        if (highScorePanel != null) {
+            highScorePanel.refreshScores();
+            cardLayout.show(mainPanel, "scores");
+        }
     }
 
     private void styleButton(JButton button, Color color) {

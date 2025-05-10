@@ -7,6 +7,8 @@ import java.awt.Graphics;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Rectangle;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
 
 public class ClientManager {
     private Socket socket;
@@ -21,18 +23,6 @@ public class ClientManager {
     private boolean connected = false;
     private Thread listenerThread;
 
-    public void sendHitMessage(String targetPlayerName) {
-        if (connected && out != null) {
-            try {
-                GameMessage hitMsg = GameMessage.createHitMessage(targetPlayerName);
-                out.writeObject(hitMsg);
-                out.flush();
-            } catch (IOException e) {
-                System.err.println("Error sending hit message: " + e.getMessage());
-                closeConnection();
-            }
-        }
-    }
     // Représente un joueur distant
     public static class RemotePlayer {
         private String name;
@@ -67,46 +57,53 @@ public class ClientManager {
         }
 
         public void draw(Graphics g) {
-            // Dessine avec couleur différente pour distinguer du joueur local
-            g.drawImage(sprites[0], x, y, 50, 60, null);
+            // Mirror y-coordinate for versus effect
+            int mirroredY = 600 - y - 60;
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.translate(x + 25, mirroredY + 30); // Move to center of sprite
+            g2d.rotate(Math.PI); // Rotate 180 degrees
+            g2d.translate(-25, -30); // Move back
+            g2d.drawImage(sprites[0], 0, 0, 50, 60, null);
+            g2d.setTransform(new AffineTransform()); // Reset transform
 
             // Nom du joueur
             g.setColor(Color.YELLOW);
             g.setFont(new Font("Arial", Font.BOLD, 12));
-            g.drawString(name, x, y - 20);
+            g.drawString(name, x, mirroredY - 20);
 
             // Barre de vie
             g.setColor(Color.RED);
-            g.fillRect(x, y - 15, 50, 5);
+            g.fillRect(x, mirroredY - 15, 50, 5);
             g.setColor(Color.CYAN);  // Couleur différente pour l'adversaire
-            g.fillRect(x, y - 15, (int)(50 * ((double)health / 3)), 5);
+            g.fillRect(x, mirroredY - 15, (int)(50 * ((double)health / 3)), 5);
         }
 
         public Rectangle getHitbox() {
-            return new Rectangle(x, y, 50, 60);
+            int mirroredY = 600 - y - 60;
+            return new Rectangle(x, mirroredY, 50, 60);
         }
 
         public String getName() { return name; }
         public int getHealth() { return health; }
-
-        public void setVerticalBounds(int i, int i1) {
-        }
     }
 
     // Représente un projectile envoyé par un joueur distant
     public static class RemoteProjectile {
-        private int x, y;
+        private int x, yOriginal; // yOriginal is the value received from the network
+        private int y; // y is the mirrored value for local display
         private boolean active = true;
         private final int speed = 10;
 
-        public RemoteProjectile(int x, int y) {
+        public RemoteProjectile(int x, int yOriginal) {
             this.x = x;
-            this.y = y;
+            this.yOriginal = yOriginal;
+            // Mirror the y-coordinate for versus effect
+            this.y = 600 - yOriginal - 15;
         }
 
         public void update() {
-            y -= speed;
-            if (y < 0) {
+            y += speed; // Move downward
+            if (y > 600) {
                 active = false;
             }
         }
@@ -280,6 +277,19 @@ public class ClientManager {
         }
     }
 
+    public void sendHitMessage(String targetPlayerName) {
+        if (connected && out != null) {
+            try {
+                GameMessage hitMsg = GameMessage.createHitMessage(targetPlayerName);
+                out.writeObject(hitMsg);
+                out.flush();
+            } catch (IOException e) {
+                System.err.println("Error sending hit message: " + e.getMessage());
+                closeConnection();
+            }
+        }
+    }
+
     public void disconnect() {
         if (connected) {
             closeConnection();
@@ -329,7 +339,6 @@ public class ClientManager {
             proj.update();
         }
     }
-
 
     public boolean isConnected() {
         return connected;
