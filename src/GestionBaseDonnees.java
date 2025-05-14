@@ -4,14 +4,50 @@ import java.util.List;
 
 public class GestionBaseDonnees {
     private static final String DB_URL = "jdbc:mysql://localhost:3306/space_defender?useSSL=false&serverTimezone=UTC";
-    private static final String DB_USER = "root"; // Remplace par ton utilisateur MySQL
-    private static final String DB_PASS = "";     // Remplace par ton mot de passe MySQL
+    private static final String DB_USER = "root";
+    private static final String DB_PASS = "";
 
     static {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
+            initializeDatabase();
         } catch (ClassNotFoundException e) {
             System.err.println("MySQL Driver not found: " + e.getMessage());
+        }
+    }
+
+    private static void initializeDatabase() {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            // Create game_results table
+            String createGameResultsTable = """
+                CREATE TABLE IF NOT EXISTS game_results (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    player_name VARCHAR(50) NOT NULL,
+                    score INT NOT NULL,
+                    level INT NOT NULL,
+                    difficulty VARCHAR(20) NOT NULL,
+                    achieved_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """;
+
+            // Create two_player_results table
+            String createTwoPlayerResultsTable = """
+                CREATE TABLE IF NOT EXISTS two_player_results (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    player1_name VARCHAR(50) NOT NULL,
+                    player1_score INT NOT NULL,
+                    player2_name VARCHAR(50) NOT NULL,
+                    player2_score INT NOT NULL,
+                    played_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """;
+
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute(createGameResultsTable);
+                stmt.execute(createTwoPlayerResultsTable);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error initializing database: " + e.getMessage());
         }
     }
 
@@ -35,11 +71,10 @@ public class GestionBaseDonnees {
 
     public static List<String> getHighScores(int limit) {
         List<String> scores = new ArrayList<>();
-        String sql = "SELECT player_name, MAX(score) as max_score, level, difficulty, " +
+        String sql = "SELECT player_name, score, level, difficulty, " +
                 "DATE_FORMAT(achieved_on, '%d/%m/%Y %H:%i') as date " +
                 "FROM game_results " +
-                "GROUP BY player_name " +  // On groupe par joueur
-                "ORDER BY max_score DESC LIMIT ?";  // On trie par meilleur score
+                "ORDER BY score DESC LIMIT ?";
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -50,7 +85,7 @@ public class GestionBaseDonnees {
             while (rs.next()) {
                 String entry = String.format("%s - %d pts (Niv.%d %s) le %s",
                         rs.getString("player_name"),
-                        rs.getInt("max_score"),  // On utilise max_score au lieu de score
+                        rs.getInt("score"),
                         rs.getInt("level"),
                         rs.getString("difficulty"),
                         rs.getString("date"));
@@ -62,6 +97,5 @@ public class GestionBaseDonnees {
         }
         return scores;
     }
-
 
 }

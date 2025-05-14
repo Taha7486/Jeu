@@ -13,8 +13,6 @@ public class Joueur {
     private final long shotCooldown;
     private final int shipType;
     private int health;
-    private boolean invincible = false;
-    private long invincibleEndTime = 0;
 
     public Joueur(int startX, int startY, int shipType) {
         this.x = startX;
@@ -23,21 +21,21 @@ public class Joueur {
         this.health = 3;
 
         switch(shipType) {
-            case 0: // Standard
+            case 0:
                 sprites[0] = GestionRessources.getImage("/ship_0.png");
                 sprites[1] = GestionRessources.getImage("/ship_0.png");
                 sprites[2] = GestionRessources.getImage("/ship_0.png");
                 speed = 5;
                 shotCooldown = 300;
                 break;
-            case 1: // Fast
+            case 1:
                 sprites[0] = GestionRessources.getImage("/ship_1.png");
                 sprites[1] = GestionRessources.getImage("/ship_1.png");
                 sprites[2] = GestionRessources.getImage("/ship_1.png");
                 speed = 7;
                 shotCooldown = 500;
                 break;
-            case 2: // Heavy
+            case 2:
                 sprites[0] = GestionRessources.getImage("/ship_2.png");
                 sprites[1] = GestionRessources.getImage("/ship_2.png");
                 sprites[2] = GestionRessources.getImage("/ship_2.png");
@@ -74,10 +72,6 @@ public class Joueur {
     }
 
     public void update() {
-        if (invincible && System.currentTimeMillis() > invincibleEndTime) {
-            invincible = false;
-        }
-
         activeKeys.forEach(key -> {
             switch (key) {
                 case KeyEvent.VK_LEFT:
@@ -105,21 +99,11 @@ public class Joueur {
     }
 
     public void takeDamage() {
-        if (!invincible) {
-            health--;
-            activateInvincibility(2000);
-        }
-    }
-
-    public void activateInvincibility(long duration) {
-        invincible = true;
-        invincibleEndTime = System.currentTimeMillis() + duration;
+        health--;
     }
 
     public void draw(Graphics g) {
-        if (!invincible || (System.currentTimeMillis() / 100) % 2 == 0) {
-            g.drawImage(sprites[currentSprite], x, y, 50, 60, null);
-        }
+        g.drawImage(sprites[currentSprite], x, y, 50, 60, null);
         drawHealthBar(g);
     }
 
@@ -147,8 +131,10 @@ public class Joueur {
     }
 
     public int getX() {
-    return x;}
+        return x;
+    }
 
-    public void setVerticalBounds(int i, int i1) {
+    public boolean isDead() {
+        return health <= 0;
     }
 }
