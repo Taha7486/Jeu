@@ -9,22 +9,25 @@ public class Server {
     private static final Set<ClientHandler> clients = new CopyOnWriteArraySet<>();
     private static final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
     private static final Set<String> playerNames = new HashSet<>();
+    private static int maxPlayersEver = 0;
 
     // Stocke les informations des joueurs
-        static class PlayerInfo {
-            int x, y;
-            int health; // Ajoutez ce champ si il n'existe pas
-            int score;
-            int shipType;
+    static class PlayerInfo {
+        int x, y;
+        int health;
+        int score;
+        int shipType;
+        boolean alive = true;
 
-            public PlayerInfo(int shipType) {
-                this.x = 380;
-                this.y = 450;
-                this.health = 3; // Initialisation de health
-                this.score = 0;
-                this.shipType = shipType;
-            }
+        public PlayerInfo(int shipType) {
+            this.x = 380;
+            this.y = 450;
+            this.health = 3;
+            this.score = 0;
+            this.shipType = shipType;
+            this.alive = true;
         }
+    }
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -60,17 +63,24 @@ public class Server {
     public static synchronized void addPlayer(String name, int shipType) {
         playerNames.add(name);
         players.put(name, new PlayerInfo(shipType));
+        if (playerNames.size() > maxPlayersEver) {
+            maxPlayersEver = playerNames.size();
+        }
         updatePlayerList();
     }
 
     public static synchronized void removeClient(ClientHandler client, String name) {
         clients.remove(client);
         playerNames.remove(name);
-        players.remove(name);
+        PlayerInfo info = players.remove(name);
+        if (info != null) {
+            info.alive = false;
+        }
         System.out.println("Player " + name + " disconnected");
-        GameMessage leaveMsg = GameMessage.createChatMessage("SYSTEM", name + " a quitté le jeu");
+        GameMessage leaveMsg = GameMessage.createChatMessage("SYSTEM", name + " a quitté le jeu", 0);
         broadcast(leaveMsg, null);
         updatePlayerList();
+        checkForWinner();
     }
 
     public static synchronized void updatePlayerPosition(String name, int x, int y, int health, int score) {
@@ -80,6 +90,16 @@ public class Server {
             player.y = y;
             player.health = health;
             player.score = score;
+
+            // If player just died (was alive but now has 0 health)
+            if (player.health <= 0 && player.alive) {
+                player.alive = false;
+                // Notify all clients about the player's death
+                GameMessage deathMsg = GameMessage.createChatMessage("SYSTEM", name + " a été éliminé!", 0);
+                broadcast(deathMsg, null);
+                // Immediately check for winner
+                checkForWinner();
+            }
         }
     }
 
@@ -88,7 +108,7 @@ public class Server {
         for (String name : playerNames) {
             sb.append(name).append(",");
         }
-        GameMessage playerListMsg = GameMessage.createChatMessage("SYSTEM", sb.toString());
+        GameMessage playerListMsg = GameMessage.createChatMessage("SYSTEM", sb.toString(), 0);
         for (ClientHandler client : clients) {
             client.sendMessage(playerListMsg);
         }
@@ -96,6 +116,31 @@ public class Server {
 
     public static synchronized Map<String, PlayerInfo> getPlayers() {
         return new HashMap<>(players);
+    }
+
+    private static synchronized void checkForWinner() {
+        // Only declare a winner if at least 2 players have ever been in the session
+        if (maxPlayersEver < 2) return;
+
+        List<String> alivePlayers = new ArrayList<>();
+        for (Map.Entry<String, PlayerInfo> entry : players.entrySet()) {
+            if (entry.getValue().alive && entry.getValue().health > 0) {
+                alivePlayers.add(entry.getKey());
+            }
+        }
+
+        // If there's only one player left, they're the winner
+        if (alivePlayers.size() == 1) {
+            String winnerName = alivePlayers.get(0);
+            // Notify all clients about the game over
+            for (ClientHandler client : clients) {
+                boolean isWinner = client.getPlayerName().equals(winnerName);
+                PlayerInfo playerInfo = players.get(client.getPlayerName());
+                int score = playerInfo != null ? playerInfo.score : 0;
+                GameMessage gameOverMsg = GameMessage.createGameOverMessage(client.getPlayerName(), isWinner, score, 0);
+                client.sendMessage(gameOverMsg);
+            }
+        }
     }
 }
 
@@ -119,6 +164,7 @@ class ClientHandler extends Thread {
             // Étape 1: Recevoir les informations de connexion du joueur
             GameMessage joinMsg = (GameMessage) in.readObject();
             if (joinMsg.getType() != GameMessage.MessageType.PLAYER_JOIN) {
+                System.err.println("Invalid initial message type from client");
                 socket.close();
                 return;
             }
@@ -127,12 +173,12 @@ class ClientHandler extends Thread {
             shipType = joinMsg.getShipType();
 
             if (Server.isNameTaken(playerName)) {
-                GameMessage nameExistsMsg = GameMessage.createChatMessage("SYSTEM", "NAME_EXISTS");
+                GameMessage nameExistsMsg = GameMessage.createChatMessage("SYSTEM", "NAME_EXISTS", 0);
                 sendMessage(nameExistsMsg);
                 socket.close();
                 return;
             } else {
-                GameMessage nameAcceptedMsg = GameMessage.createChatMessage("SYSTEM", "NAME_ACCEPTED");
+                GameMessage nameAcceptedMsg = GameMessage.createChatMessage("SYSTEM", "NAME_ACCEPTED", 0);
                 sendMessage(nameAcceptedMsg);
                 Server.addPlayer(playerName, shipType);
 
@@ -140,75 +186,87 @@ class ClientHandler extends Thread {
                 for (Map.Entry<String, Server.PlayerInfo> entry : Server.getPlayers().entrySet()) {
                     if (!entry.getKey().equals(playerName)) {
                         Server.PlayerInfo pInfo = entry.getValue();
-                        GameMessage existingPlayer = GameMessage.createJoinMessage(entry.getKey(), pInfo.shipType);
+                        GameMessage existingPlayer = GameMessage.createJoinMessage(entry.getKey(), pInfo.shipType, 0);
                         sendMessage(existingPlayer);
                     }
                 }
 
                 // Informer les autres joueurs de l'arrivée d'un nouveau joueur
-                GameMessage newPlayerMsg = GameMessage.createJoinMessage(playerName, shipType);
+                GameMessage newPlayerMsg = GameMessage.createJoinMessage(playerName, shipType, 0);
                 Server.broadcast(newPlayerMsg, this);
 
-                GameMessage chatMsg = GameMessage.createChatMessage("SYSTEM", playerName + " a rejoint le jeu");
+                GameMessage chatMsg = GameMessage.createChatMessage("SYSTEM", playerName + " a rejoint le jeu", 0);
                 Server.broadcast(chatMsg, null);
             }
 
             // Boucle principale de traitement des messages
             while (running) {
-                GameMessage clientMessage = (GameMessage) in.readObject();
-
-                switch (clientMessage.getType()) {
-                    case PLAYER_POSITION:
-                        Server.updatePlayerPosition(
-                                playerName,
-                                clientMessage.getX(),
-                                clientMessage.getY(),
-                                clientMessage.getHealth(),
-                                clientMessage.getScore()
-                        );
-                        Server.broadcast(clientMessage, this);
+                try {
+                    GameMessage clientMessage = (GameMessage) in.readObject();
+                    if (clientMessage == null) {
+                        System.err.println("Received null message from " + playerName);
                         break;
+                    }
 
-                    case PLAYER_SHOOT:
-                        Server.broadcast(clientMessage, null);
-                        break;
+                    switch (clientMessage.getType()) {
+                        case PLAYER_POSITION:
+                            Server.updatePlayerPosition(
+                                    playerName,
+                                    clientMessage.getX(),
+                                    clientMessage.getY(),
+                                    clientMessage.getHealth(),
+                                    clientMessage.getScore()
+                            );
+                            Server.broadcast(clientMessage, this);
+                            break;
 
-                    case PLAYER_HIT:
-                        Server.PlayerInfo hitPlayer = Server.getPlayers().get(clientMessage.getPlayerName());
-                        if (hitPlayer != null) {
-                            hitPlayer.health--;
-                            if (hitPlayer.health <= 0) {
-                                // Envoyer un message de fin de partie à tous les joueurs
-                                GameMessage gameOverMsg = GameMessage.createChatMessage("SYSTEM", clientMessage.getPlayerName() + " a été éliminé !");
-                                Server.broadcast(gameOverMsg, null);
-                                // Envoyer un message de fin de partie pour tous les joueurs
-                                GameMessage gameoverForAll = GameMessage.createChatMessage("SYSTEM", "La partie est terminée !");
-                                Server.broadcast(gameoverForAll, null);
-                            }
-                        }
-                        Server.broadcast(clientMessage, null);
-                        break;
+                        case PLAYER_SHOOT:
+                            Server.broadcast(clientMessage, null);
+                            break;
 
-                    case CHAT_MESSAGE:
-                        GameMessage formattedMsg = GameMessage.createChatMessage(
-                                playerName, clientMessage.getChatContent());
-                        Server.broadcast(formattedMsg, null);
-                        break;
+                        case PLAYER_HIT:
+                            Server.broadcast(clientMessage, null);
+                            break;
 
-                    default:
-                        // Ignorer les messages non reconnus
-                        break;
+                        case GAME_OVER:
+                            // Broadcast the game over message to all clients
+                            Server.broadcast(clientMessage, null);
+                            break;
+
+                        case CHAT_MESSAGE:
+                            GameMessage formattedMsg = GameMessage.createChatMessage(
+                                    playerName, clientMessage.getChatContent(), clientMessage.getMatchId()
+                            );
+                            Server.broadcast(formattedMsg, null);
+                            break;
+
+                        default:
+                            System.err.println("Unknown message type from " + playerName + ": " + clientMessage.getType());
+                            break;
+                    }
+                } catch (EOFException e) {
+                    System.err.println("Connection closed by client " + playerName);
+                    break;
+                } catch (SocketException e) {
+                    System.err.println("Socket error for client " + playerName + ": " + e.getMessage());
+                    break;
+                } catch (IOException e) {
+                    System.err.println("IO error for client " + playerName + ": " + e.getMessage());
+                    break;
+                } catch (ClassNotFoundException e) {
+                    System.err.println("Invalid message format from " + playerName);
+                    break;
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error handling client " + playerName + ": " + e.getMessage());
+            System.err.println("Error handling client " + (playerName != null ? playerName : "unknown") + ": " + e.getMessage());
         } finally {
             try {
                 if (socket != null && !socket.isClosed()) {
                     socket.close();
                 }
             } catch (IOException e) {
-                System.err.println("Error closing socket: " + e.getMessage());
+                System.err.println("Error closing socket for " + (playerName != null ? playerName : "unknown") + ": " + e.getMessage());
             }
             Server.removeClient(this, playerName);
         }
@@ -228,5 +286,9 @@ class ClientHandler extends Thread {
 
     public void stopRunning() {
         this.running = false;
+    }
+
+    public String getPlayerName() {
+        return playerName;
     }
 }
