@@ -141,9 +141,8 @@ src/
 | ESSAMIT Taha | Développement du jeu |
 | HAJJOU Hajar | Développement du jeu |
 | ZERBOUHI Oumaima | Développement du jeu |
-| HARISS Houssam | Gestion base de données |
+| HARISS Houssam | Développement du jeu  |
 
-> 📚 Projet encadré par **Prof. ELBOUHDIDI Jaber** — ENSA Tétouan, S2 2024/2025
 
 ---
 
